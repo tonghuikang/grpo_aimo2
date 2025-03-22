@@ -1244,10 +1244,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
                 generation_logs_all.extend(generation_logs_for_question)
             if generation_logs_all:
                 df = pd.DataFrame(generation_logs_all)
-                df = df.sort_values("timestamp")
-                df = df.sort_values("generation_idx")
-                df = df.sort_values("method")
-                df = df.sort_values("question")
+                df = df.sort_values(["question", "method", "generation_idx", "timestamp"])
                 df.to_csv(f"generation_logs.csv", index=False)
                 df[df["reason"] == "final"].to_csv(
                     f"generation_logs_final.csv", index=False
