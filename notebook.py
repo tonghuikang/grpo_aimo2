@@ -802,6 +802,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "code",
             "generation_idx": generation_idx,
+            "timestamp": time.time() - start_time,
             "elapsed": prompt,
             "flag_for_training": flag_for_training,
         }
@@ -939,9 +940,11 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "code",
             "generation_idx": generation_idx,
+            "timestamp": time.time() - start_time,
             "prompt": prompt,
             "elapsed": last_attempted_prompt,
             "buffer": prompt[len(last_attempted_prompt) :],
+            "flag_for_training": True,
             "reason": "final",
         }
     )
@@ -1030,8 +1033,10 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
                 "question": question,
                 "method": "math",
                 "generation_idx": generation_idx,
+                "timestamp": time.time() - start_time,
                 "prompt": prompt,
                 "buffer": buffer,
+                "flag_for_training": False,
                 "reason": "stream_complete",
             }
         )
@@ -1049,8 +1054,10 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "math",
             "generation_idx": generation_idx,
+            "timestamp": time.time() - start_time,
             "prompt": prompt,
             "buffer": buffer,
+            "flag_for_training": False,
             "reason": "final",
         }
     )
@@ -1223,12 +1230,16 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
                 generation_logs_all.extend(generation_logs_for_question)
             if generation_logs_all:
                 df = pd.DataFrame(generation_logs_all)
+                df = df.sort_values("timestamp")
                 df = df.sort_values("generation_idx")
                 df = df.sort_values("method")
                 df = df.sort_values("question")
                 df.to_csv(f"generation_logs.csv", index=False)
                 df[df["reason"] == "final"].to_csv(
                     f"generation_logs_final.csv", index=False
+                )
+                df[df["flag_for_training"]].to_csv(
+                    f"generation_logs_training.csv", index=False
                 )
 
     print("final", answer)
