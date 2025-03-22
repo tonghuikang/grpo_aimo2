@@ -30,9 +30,7 @@ MINUTES = 60
 HOURS = 60 * MINUTES
 
 
-app = modal.App(
-    image=image, secrets=[modal.Secret.from_name("huggingface")]
-)
+app = modal.App(image=image, secrets=[modal.Secret.from_name("huggingface")])
 
 
 @app.function(volumes={MODELS_DIR: volume}, timeout=4 * HOURS)

@@ -8,9 +8,7 @@ import modal
 import modal.gpu
 import asyncio
 
-vllm_image = modal.Image.debian_slim(python_version="3.10").pip_install(
-    "vllm==0.7.1"
-)
+vllm_image = modal.Image.debian_slim(python_version="3.10").pip_install("vllm==0.7.1")
 
 MODELS_DIR = "/aimo2"
 
@@ -34,13 +32,16 @@ except modal.exception.NotFoundError:
 
 app = modal.App("example-vllm-openai-compatible-salt1337-4xl4")
 
-TOKEN = "super-secret-token"  # auth token. for production use, replace with a modal.Secret
+TOKEN = (
+    "super-secret-token"  # auth token. for production use, replace with a modal.Secret
+)
 
 MINUTES = 60  # seconds
 HOURS = 60 * MINUTES
 
 
 from argparse import Namespace
+
 
 @app.function(
     image=vllm_image,
@@ -115,7 +116,7 @@ def serve():
     )
 
     model_config = get_model_config(engine)
-    
+
     args = Namespace()
     args.response_role = "assistant"
     args.chat_template = None
@@ -134,7 +135,14 @@ def serve():
     args.enable_reasoning = False
     args.reasoning_parser = None
 
-    asyncio.run(init_app_state(engine_client=engine, model_config=model_config, state=web_app.state, args=args))
+    asyncio.run(
+        init_app_state(
+            engine_client=engine,
+            model_config=model_config,
+            state=web_app.state,
+            args=args,
+        )
+    )
     mount_metrics(web_app)
 
     return web_app

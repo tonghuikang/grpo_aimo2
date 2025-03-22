@@ -3,7 +3,9 @@ name = "grpo_example"
 version = "0.1.0"
 description = "GRPO training example"
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "wandb>=0.19.8",
+]
 
 [build-system]
 requires = ["setuptools>=42"]
