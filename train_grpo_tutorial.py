@@ -8,14 +8,14 @@ image = (
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")
 )
 
-GPU = modal.gpu.H100(count=2)
+GPU = modal.gpu.H100(count=1)
 app = modal.App("grpo-training", image=image)
 
 
 @app.function(
     image=image,
     gpu=GPU,
-    timeout=24 * 60 * 60,
+    timeout=2 * 60 * 60,
 )
 def train_grpo():
     import os
@@ -35,11 +35,13 @@ def train_grpo():
         def count(srr):
             prev = -1
             count = 0
-            for x in srr:
-                if ord(x) > prev:
-                    prev = ord(x)
-                    count += 1
-            return count**2 / (1 + len(srr))
+            for word in srr.split():
+                if word:
+                    x = word[0]
+                    if ord(x) > prev:
+                        prev = ord(x)
+                        count += 1
+            return count**3 / (1 + len(srr))
 
         return [count(completion) for completion in completions]
 
