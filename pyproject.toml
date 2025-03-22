@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "GRPO training example"
 requires-python = ">=3.8"
 dependencies = [
+    "ipython>=8.12.3",
     "vllm>=0.5.5",
     "wandb>=0.19.8",
 ]
