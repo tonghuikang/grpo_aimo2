@@ -18,6 +18,9 @@ app = modal.App("grpo-training", image=image)
     timeout=24 * 60 * 60,
 )
 def train_grpo():
+    import os
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
     from datasets import load_dataset
     from trl import GRPOConfig, GRPOTrainer
     import wandb
@@ -46,9 +49,10 @@ def train_grpo():
         report_to="wandb",
         num_train_epochs=1.0,
         use_vllm=True,
-        vllm_gpu_memory_utilization=0.9,
+        vllm_gpu_memory_utilization=0.2,
         max_prompt_length=512,
         vllm_device="cuda:0",
+        vllm_dtype="half",
         vllm_max_model_len=2048,
     )
     trainer = GRPOTrainer(
@@ -57,6 +61,7 @@ def train_grpo():
         args=training_args,
         train_dataset=dataset,
     )
+    print("training start")
     trainer.train()
 
     # Close wandb run when training is complete
