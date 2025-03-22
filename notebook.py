@@ -944,7 +944,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "prompt": prompt,
             "elapsed": last_attempted_prompt,
             "buffer": prompt[len(last_attempted_prompt) :],
-            "flag_for_training": True,
+            "flag_for_training": False,
             "reason": "final",
         }
     )
