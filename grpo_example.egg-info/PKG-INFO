@@ -3,6 +3,9 @@ Name: grpo_example
 Version: 0.1.0
 Summary: GRPO training example
 Requires-Python: >=3.8
+Requires-Dist: ipykernel>=6.29.5
 Requires-Dist: ipython>=8.12.3
+Requires-Dist: modal>=0.65.66
+Requires-Dist: trl>=0.11.4
 Requires-Dist: vllm>=0.5.5
 Requires-Dist: wandb>=0.19.8

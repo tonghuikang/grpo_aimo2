@@ -4,7 +4,7 @@ import modal.gpu
 
 image = (
     modal.Image.debian_slim()
-    .pip_install("datasets", "trl", "torch", "transformers", "wandb")
+    .pip_install("datasets", "trl", "torch", "transformers", "wandb", "vllm")
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")
 )
 
@@ -28,15 +28,27 @@ def train_grpo():
     dataset = load_dataset("trl-lib/tldr", split="train")
 
     # Define the reward function, which rewards completions that are close to 20 characters
-    def reward_len(completions, **kwargs):
-        return [-abs(20 - len(completion)) for completion in completions]
+    def reward_func(completions, **kwargs):
+        def count(srr):
+            prev = -1
+            count = 0
+            for x in srr:
+                if ord(x) > prev:
+                    prev = ord(x)
+                    count += 1
+            return count**2 / (1 + len(srr))
+        return [count(completion) for completion in completions]
 
     training_args = GRPOConfig(
-        output_dir="Qwen2-0.5B-GRPO", logging_steps=10, report_to="wandb"
+        output_dir="Qwen2-0.5B-GRPO",
+        logging_steps=10,
+        report_to="wandb",
+        num_train_epochs=1.0,
+        use_vllm=True,
     )
     trainer = GRPOTrainer(
         model="Qwen/Qwen2-0.5B-Instruct",
-        reward_funcs=reward_len,
+        reward_funcs=reward_func,
         args=training_args,
         train_dataset=dataset,
     )
