@@ -1,6 +1,7 @@
 import os
 import argparse
 
+
 def is_on_kaggle_submission() -> bool:
     return bool(os.getenv("KAGGLE_IS_COMPETITION_RERUN"))
 
@@ -8,13 +9,25 @@ def is_on_kaggle_submission() -> bool:
 if __name__ == "__main__":
     # Add command line arguments parser for our custom arguments
     parser = argparse.ArgumentParser(description="Serve a model with vLLM")
-    parser.add_argument("--model-path", type=str, required=True, help="Path to the model")
-    parser.add_argument("--model-name", type=str, required=True, help="Name of the model")
-    parser.add_argument("--max-model-len", type=int, required=True, help="Maximum model length")
-    parser.add_argument("--max-num-seqs", type=int, required=True, help="Maximum number of sequences")
+    parser.add_argument(
+        "--model-path", type=str, required=True, help="Path to the model"
+    )
+    parser.add_argument(
+        "--model-name", type=str, required=True, help="Name of the model"
+    )
+    parser.add_argument(
+        "--max-model-len", type=int, required=True, help="Maximum model length"
+    )
+    parser.add_argument(
+        "--max-num-seqs", type=int, required=True, help="Maximum number of sequences"
+    )
     parser.add_argument("--n-gpu", type=int, default=4, help="Number of GPUs to use")
-    parser.add_argument("--cuda-visible-devices", type=str, default="0,1,2,3", 
-                        help="CUDA visible devices")
+    parser.add_argument(
+        "--cuda-visible-devices",
+        type=str,
+        default="0,1,2,3",
+        help="CUDA visible devices",
+    )
     custom_args = parser.parse_args()
 
     from vllm.entrypoints.openai.cli_args import make_arg_parser

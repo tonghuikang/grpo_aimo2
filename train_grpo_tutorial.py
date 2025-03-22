@@ -4,11 +4,11 @@ import modal.gpu
 
 image = (
     modal.Image.debian_slim()
-    .pip_install("datasets", "trl", "torch", "transformers", "wandb", "vllm")
+    .pip_install("datasets", "trl==0.15.2", "torch", "transformers", "wandb", "vllm==0.7.1")
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")
 )
 
-GPU = modal.gpu.H100(count=1)
+GPU = modal.gpu.H100(count=2)
 app = modal.App("grpo-training", image=image)
 
 
@@ -37,6 +37,7 @@ def train_grpo():
                     prev = ord(x)
                     count += 1
             return count**2 / (1 + len(srr))
+
         return [count(completion) for completion in completions]
 
     training_args = GRPOConfig(
@@ -45,6 +46,10 @@ def train_grpo():
         report_to="wandb",
         num_train_epochs=1.0,
         use_vllm=True,
+        vllm_gpu_memory_utilization=0.9,
+        max_prompt_length=512,
+        vllm_device="cuda:0",
+        vllm_max_model_len=2048,
     )
     trainer = GRPOTrainer(
         model="Qwen/Qwen2-0.5B-Instruct",
