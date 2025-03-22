@@ -21,6 +21,7 @@ import numpy as np
 
 pd.set_option("display.max_colwidth", None)
 start_time = time.time()
+question_start_time = time.time()
 final_cutoff_time = start_time + (4 * 60 + 45) * 60  # 4.75 hours from start time
 cutoff_times = [
     int(x) for x in np.linspace(final_cutoff_time, start_time + 10 * 60, 50 + 1)
@@ -52,6 +53,14 @@ LLM_SERVER_URL = (
 N_GPU = 4
 MAX_NUM_SEQS = CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
 USE_LOCAL_LLM = bool(LLM_SERVER_URL == "http://0.0.0.0:8000/v1")
+
+import pandas as pd
+
+REFERENCE_CSV = "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
+df_reference = pd.read_csv(REFERENCE_CSV)
+question_to_answer_map: dict[str, str] = dict(
+    zip(df_reference["problem"], df_reference["answer"])
+)
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
@@ -802,7 +811,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "code",
             "generation_idx": generation_idx,
-            "timestamp": time.time() - start_time,
+            "timestamp": time.time() - question_start_time,
             "elapsed": prompt,
             "flag_for_training": flag_for_training,
         }
@@ -940,7 +949,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "code",
             "generation_idx": generation_idx,
-            "timestamp": time.time() - start_time,
+            "timestamp": time.time() - question_start_time,
             "prompt": prompt,
             "elapsed": last_attempted_prompt,
             "buffer": prompt[len(last_attempted_prompt) :],
@@ -950,6 +959,8 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     )
     for generation_log in generation_logs_local:
         generation_log["eventual_answer"] = answer
+    for generation_log in generation_logs_local:
+        generation_log["correct_answer"] = question_to_answer_map.get(question, "")
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
@@ -1065,6 +1076,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
     # Add eventual_answer to all log entries
     for generation_log in generation_logs_local:
         generation_log["eventual_answer"] = answer
+    for generation_log in generation_logs_local:
+        generation_log["correct_answer"] = question_to_answer_map.get(question, "")
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
@@ -1154,7 +1167,7 @@ results_lock = threading.Lock()  # Thread lock for protecting shared results
 
 
 def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
-    global math_results, code_results, generation_logs, current_question
+    global math_results, code_results, generation_logs, current_question, question_start_time
     import time
 
     # Reset global result arrays
@@ -1163,6 +1176,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         code_results[question] = []
         generation_logs[question] = []
         current_question = question
+        question_start_time = time.time()
 
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
@@ -1287,6 +1301,7 @@ if is_on_kaggle_interactive():
         math_results[question_sample] = []
         code_results[question_sample] = []
         generation_logs[question_sample] = []
+        question_start_time = time.time()
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:50:34.208896Z","iopub.execute_input":"2025-03-19T08:50:34.209197Z","iopub.status.idle":"2025-03-19T08:52:22.152911Z","shell.execute_reply.started":"2025-03-19T08:50:34.209171Z","shell.execute_reply":"2025-03-19T08:52:22.152191Z"},"jupyter":{"outputs_hidden":false}}
 if is_on_kaggle_interactive():
