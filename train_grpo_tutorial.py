@@ -28,6 +28,16 @@ def train_grpo():
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+    # Start vllm server as a background process
+    import os
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    subprocess.Popen(
+        ["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME],
+        # stdout=subprocess.DEVNULL,  # suppress stdout
+    )
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     from datasets import load_dataset
     from trl import GRPOConfig, GRPOTrainer
     import wandb
@@ -52,20 +62,13 @@ def train_grpo():
 
         return [count(completion) for completion in completions]
 
-    # Start vllm server as a background process
-    import os
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    subprocess.Popen(
-        ["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME],
-        stdout=subprocess.DEVNULL,  # suppress stdout
-    )
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     training_args = GRPOConfig(
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         output_dir="Qwen2-0.5B-GRPO",
         logging_steps=10,
+        gradient_accumulation_steps=4,
+        num_generations=16,
+        per_device_train_batch_size=16,
         report_to="wandb",
         num_train_epochs=1.0,
         use_vllm=True,
