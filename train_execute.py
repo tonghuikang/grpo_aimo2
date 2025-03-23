@@ -45,6 +45,15 @@ app = modal.App("grpo-training", image=image)
     timeout=2 * 60 * 60,
 )
 def train_grpo():
+    # Initialize wandb for metrics logging
+    import os
+    import wandb
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = (
+        VLLM_CUDA_VISIBLE_DEVICES + "," + TRAIN_CUDA_VISIBLE_DEVICES
+    )
+    wandb.init(project="grpo-training", name=REFERENCE_MODEL_NAME)
+
     import os
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -78,11 +87,7 @@ def train_grpo():
         # stdout=subprocess.DEVNULL,  # suppress stdout
     )
 
-    import wandb
-
-    # Initialize wandb for metrics logging
-    wandb.init(project="grpo-training", name=REFERENCE_MODEL_NAME)
-
+    # Launch training
     os.environ["CUDA_VISIBLE_DEVICES"] = TRAIN_CUDA_VISIBLE_DEVICES
     subprocess.run(
         [
