@@ -1,6 +1,10 @@
 # train_grpo.py
 
-REFERENCE_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+from train_config import (
+    REFERENCE_MODEL_NAME,
+    TRAIN_CUDA_VISIBLE_DEVICES,
+)
+
 
 if __name__ == "__main__":
     import os
@@ -9,7 +13,8 @@ if __name__ == "__main__":
 
     # Start vllm server as a background process
     import os
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = TRAIN_CUDA_VISIBLE_DEVICES
 
     # Load tokenizer for scoring use
     from transformers import AutoTokenizer
@@ -22,7 +27,6 @@ if __name__ == "__main__":
     )
     print("Tokenizer loaded")
 
-
     # Define reward function
     import datasets
 
@@ -30,17 +34,13 @@ if __name__ == "__main__":
     # dataset = datasets.load_dataset("trl-lib/tldr", split="train")
     # dataset = dataset.select(range(1600))
 
-
     import math
-
 
     def length_preference_function(length, preferred_length=256):
         x = length / preferred_length
         return math.e * x * math.exp(-x)
 
-
     import re
-
 
     def reward_func_individual(completion, correct_answer):
         match = re.search(r"\\boxed\{(.*?)\}", completion)
@@ -64,13 +64,11 @@ if __name__ == "__main__":
 
         return length_preference_function(completion_length)
 
-
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [
             reward_func_individual(completion, correct_answer_)
             for completion, correct_answer_ in zip(completions, correct_answer)
         ]
-
 
     # Define training config
     from trl import GRPOConfig, GRPOTrainer
@@ -102,7 +100,9 @@ if __name__ == "__main__":
     import torch.distributed as dist
 
     print("Environment Variables:")
-    print(f"  CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'not set')}")
+    print(
+        f"  CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'not set')}"
+    )
     print(f"  LOCAL_RANK: {os.environ.get('LOCAL_RANK', 'not set')}")
     print(f"  WORLD_SIZE: {os.environ.get('WORLD_SIZE', 'not set')}")
     print(f"  RANK: {os.environ.get('RANK', 'not set')}")
@@ -127,7 +127,10 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=dataset,
     )
-    print("trainer.model.generation_config.stop_strings", trainer.model.generation_config.stop_strings)
+    print(
+        "trainer.model.generation_config.stop_strings",
+        trainer.model.generation_config.stop_strings,
+    )
 
     print(f"\nTrainer Configuration:")
     print(f"  trainer.accelerator.num_processes: {trainer.accelerator.num_processes}")
@@ -136,7 +139,9 @@ if __name__ == "__main__":
     # Print trainer.accelerator state information
     print(f"  Accelerator state: {trainer.accelerator.state}")
     print(f"  Accelerator distributed type: {trainer.accelerator.distributed_type}")
-    print(f"  Accelerator local process index: {trainer.accelerator.local_process_index}")
+    print(
+        f"  Accelerator local process index: {trainer.accelerator.local_process_index}"
+    )
     print(f"  Accelerator process index: {trainer.accelerator.process_index}")
 
     # Print trainer device map if available
@@ -186,7 +191,9 @@ if __name__ == "__main__":
         )
 
     # Check CUDA distribution
-    if hasattr(trainer, "accelerator") and hasattr(trainer.accelerator, "use_distributed"):
+    if hasattr(trainer, "accelerator") and hasattr(
+        trainer.accelerator, "use_distributed"
+    ):
         print(f"  Accelerator using distributed: {trainer.accelerator.use_distributed}")
 
     # Check GPU allocation
@@ -219,14 +226,18 @@ if __name__ == "__main__":
         mem_info = torch.cuda.mem_get_info(i)
         free_mem = mem_info[0] / 1024**3  # Convert to GB
         total_mem = mem_info[1] / 1024**3  # Convert to GB
-        memory_info.append(f"Device {i}: {free_mem:.2f}GB free / {total_mem:.2f}GB total")
+        memory_info.append(
+            f"Device {i}: {free_mem:.2f}GB free / {total_mem:.2f}GB total"
+        )
     print(f"  CUDA memory info: {memory_info}")
 
     # Print information from the accelerator state
     print(f"  Accelerator's state device: {trainer.accelerator.state.device}")
 
     # Distributed check
-    print(f"  trainer.accelerator.distributed_type: {trainer.accelerator.distributed_type}")
+    print(
+        f"  trainer.accelerator.distributed_type: {trainer.accelerator.distributed_type}"
+    )
     print(
         f"  Relationship check: {training_args.num_generations} = {trainer.accelerator.num_processes} * {training_args.per_device_train_batch_size}? {training_args.num_generations == trainer.accelerator.num_processes * training_args.per_device_train_batch_size}"
     )
