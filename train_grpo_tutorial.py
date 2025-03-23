@@ -29,6 +29,15 @@ def train_grpo():
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+    # Monkey patch to stop generating on ```python
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/scripts/vllm_serve.py"
+    with open(file_path, 'r') as file:
+        content = file.read()
+    print("index", content.index("n=request.n,"))
+    modified_content = content.replace('n=request.n,', 'n=request.n, stop="```python",')
+    with open(file_path, 'w') as file:
+        file.write(modified_content)
+
     # Start vllm server as a background process
     import os
     import subprocess

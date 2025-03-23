@@ -91,7 +91,7 @@ if __name__ == "__main__":
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=1,  # this means reusing completions?
         output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
-        logging_steps=16,
+        logging_steps=8,
         # vllm configs
         use_vllm=True,
         # logging configs
@@ -127,6 +127,7 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=dataset,
     )
+    print("trainer.model.generation_config.stop_strings", trainer.model.generation_config.stop_strings)
 
     print(f"\nTrainer Configuration:")
     print(f"  trainer.accelerator.num_processes: {trainer.accelerator.num_processes}")

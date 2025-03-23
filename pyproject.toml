@@ -7,7 +7,7 @@ dependencies = [
     "ipykernel>=6.29.5",
     "ipython>=8.12.3",
     "modal>=0.73.116",
-    "trl==0.16.0",
+    "trl[vllm]==0.16.0",
     "wandb>=0.19.8",
 ]
 
