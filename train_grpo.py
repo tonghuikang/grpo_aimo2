@@ -3,6 +3,8 @@
 from train_config import (
     REFERENCE_MODEL_NAME,
     TRAIN_CUDA_VISIBLE_DEVICES,
+    NUM_GENERATIONS,
+    TRAIN_NUM_GPUS,
 )
 
 
@@ -57,11 +59,12 @@ if __name__ == "__main__":
         if not answer_attempt:
             # penalize long sequences, likely attempting to solve on its own
             # not sure if it affects the math sequences
-            return 0.1 * length_preference_function(completion_length)
+            return -0.5 + 0.5 * length_preference_function(completion_length)
 
         if not answer_correct:
             return -1
 
+        # attempted answer and is correct
         return length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
@@ -82,14 +85,15 @@ if __name__ == "__main__":
         # Currently, I am forced to have lots of GPUs before I can have a huge number of generations
         # Breaking them down into separate generations is not the same,
         # because that results in a different advantage calculation
-        num_generations=8,
-        per_device_train_batch_size=4,  # num_devices * this_number should be num_generations
-        gradient_accumulation_steps=8,
+        num_generations=NUM_GENERATIONS,
+        per_device_train_batch_size=NUM_GENERATIONS
+        // TRAIN_NUM_GPUS,  # num_devices * this_number should be num_generations
+        gradient_accumulation_steps=1,
         num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=1,  # this means reusing completions?
         output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
-        logging_steps=8,
+        logging_steps=1,
         # vllm configs
         use_vllm=True,
         # logging configs

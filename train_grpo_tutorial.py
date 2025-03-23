@@ -35,7 +35,9 @@ def train_grpo():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     # Monkey patch to stop generating on ```python
-    import trl; print(trl.__file__)
+    import trl
+
+    print(trl.__file__)
     file_path = "/usr/local/lib/python3.11/site-packages/trl/scripts/vllm_serve.py"
     with open(file_path, "r") as file:
         content = file.read()
@@ -50,7 +52,14 @@ def train_grpo():
 
     os.environ["CUDA_VISIBLE_DEVICES"] = VLLM_CUDA_VISIBLE_DEVICES
     subprocess.Popen(
-        ["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME, "--max_model_len", "4096"],
+        [
+            "trl",
+            "vllm-serve",
+            "--model",
+            REFERENCE_MODEL_NAME,
+            "--max_model_len",
+            "4096",
+        ],
         # stdout=subprocess.DEVNULL,  # suppress stdout
     )
 
