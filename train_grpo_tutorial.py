@@ -68,12 +68,14 @@ def train_grpo():
         max_completion_length=1024,
         max_prompt_length=1024,
         # training config, see docstring in GRPOTrainer._get_train_sampler
-        # I want a huge number of generations so I can calculate the reward for all of them
+        # I want a huge number of generations so I can calculate the reward / advantage for all of them
         # Currently, I am forced to have lots of GPUs before I can have a huge number of generations
-        num_generations=16,
-        per_device_train_batch_size=16,  # num_devices * this_number should be num_generations
+        # Breaking them down into separate generations is not the same,
+        # because that results in a different advantage calculation
+        num_generations=8,
+        per_device_train_batch_size=8,  # num_devices * this_number should be num_generations
         num_train_epochs=1.0,
-        gradient_accumulation_steps=16,
+        gradient_accumulation_steps=8,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=1,  # this means reusing completions?
         output_dir="Qwen2-0.5B-GRPO",
