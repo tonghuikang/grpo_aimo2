@@ -1,21 +1,26 @@
 # train_grpo.py
+
+import subprocess
+
 import modal
 import modal.gpu
 
 image = (
     modal.Image.debian_slim()
-    .pip_install("datasets", "trl==0.15.2", "torch", "transformers", "wandb", "vllm==0.7.1")
+    .pip_install("datasets", "trl[vllm]", "wandb")
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")
 )
 
-GPU = modal.gpu.H100(count=1)
+GPU = "H100:2"
 app = modal.App("grpo-training", image=image)
 
+
+REFERENCE_MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 
 @app.function(
     image=image,
     gpu=GPU,
-    timeout=2 * 60 * 60,
+    timeout=1 * 60 * 60,
 )
 def train_grpo():
     import os
@@ -45,20 +50,23 @@ def train_grpo():
 
         return [count(completion) for completion in completions]
 
+    # Start vllm server as a background process
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    subprocess.Popen(["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME])
+    
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     training_args = GRPOConfig(
+        # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         output_dir="Qwen2-0.5B-GRPO",
         logging_steps=10,
         report_to="wandb",
         num_train_epochs=1.0,
         use_vllm=True,
-        vllm_gpu_memory_utilization=0.2,
-        max_prompt_length=512,
-        vllm_device="cuda:0",
-        vllm_dtype="half",
-        vllm_max_model_len=2048,
     )
     trainer = GRPOTrainer(
-        model="Qwen/Qwen2-0.5B-Instruct",
+        # model="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        model=REFERENCE_MODEL_NAME,
         reward_funcs=reward_func,
         args=training_args,
         train_dataset=dataset,
