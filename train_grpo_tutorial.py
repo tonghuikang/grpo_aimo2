@@ -17,6 +17,7 @@ app = modal.App("grpo-training", image=image)
 
 REFERENCE_MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 
+
 @app.function(
     image=image,
     gpu=GPU,
@@ -24,6 +25,7 @@ REFERENCE_MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 )
 def train_grpo():
     import os
+
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     from datasets import load_dataset
@@ -52,9 +54,13 @@ def train_grpo():
 
     # Start vllm server as a background process
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    subprocess.Popen(["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME])
-    
+    subprocess.Popen(
+        ["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME],
+        stdout=subprocess.DEVNULL,  # suppress stdout
+    )
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     training_args = GRPOConfig(
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
