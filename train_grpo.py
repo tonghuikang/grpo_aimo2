@@ -29,6 +29,18 @@ if __name__ == "__main__":
     )
     print("Tokenizer loaded")
 
+    import torch
+    from liger_kernel.transformers import AutoLigerKernelForCausalLM
+
+    model_kwargs = dict(
+        torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        use_cache=False,
+    )
+    model = AutoLigerKernelForCausalLM.from_pretrained(
+        REFERENCE_MODEL_NAME, **model_kwargs
+    )
+
     # Define reward function
     import datasets
 
@@ -86,8 +98,8 @@ if __name__ == "__main__":
         # Breaking them down into separate generations is not the same,
         # because that results in a different advantage calculation
         num_generations=NUM_GENERATIONS,
-        per_device_train_batch_size=NUM_GENERATIONS
-        // TRAIN_NUM_GPUS,  # num_devices * this_number should be num_generations
+        per_device_train_batch_size=NUM_GENERATIONS // TRAIN_NUM_GPUS,
+        # num_devices * this_number should be num_generations
         gradient_accumulation_steps=1,
         num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
@@ -126,7 +138,7 @@ if __name__ == "__main__":
 
     # Now initialize the trainer
     trainer = GRPOTrainer(
-        model=REFERENCE_MODEL_NAME,
+        model=model,
         reward_funcs=reward_func,
         args=training_args,
         train_dataset=dataset,

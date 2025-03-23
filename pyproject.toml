@@ -9,6 +9,7 @@ dependencies = [
     "modal>=0.73.116",
     "trl[vllm]==0.16.0",
     "wandb>=0.19.8",
+    "liger-kernel",
 ]
 
 [build-system]

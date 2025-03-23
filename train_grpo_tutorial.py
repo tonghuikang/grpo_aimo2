@@ -11,9 +11,24 @@ from train_config import (
     GPU,
 )
 
+cuda_version = "12.8.0"  # should be no greater than host CUDA version
+flavor = "devel"  #  includes full CUDA toolkit
+operating_sys = "ubuntu22.04"
+tag = f"{cuda_version}-{flavor}-{operating_sys}"
+
 image = (
-    modal.Image.debian_slim()
-    .pip_install("datasets", "trl[vllm]", "wandb")
+    modal.Image.from_registry(f"nvidia/cuda:{tag}", add_python="3.11")
+    .pip_install(
+        "datasets",
+        "trl[vllm]",
+        "torch==2.5.1",
+        "wandb",
+        "liger-kernel",
+        "wheel",
+    )
+    .pip_install(  # add flash-attn
+        "flash-attn==2.7.4.post1", extra_options="--no-build-isolation"
+    )
     .add_local_file("./train_grpo.py", "/root/train_grpo.py")
     .add_local_file("./train_config.py", "/root/train_config.py")
     .add_local_file("./training_dataset.csv", "/root/training_dataset.csv")
