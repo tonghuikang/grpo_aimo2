@@ -15,13 +15,13 @@ GPU = "H100:2"
 app = modal.App("grpo-training", image=image)
 
 
-REFERENCE_MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
+REFERENCE_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 
 
 @app.function(
     image=image,
     gpu=GPU,
-    timeout=1 * 60 * 60,
+    timeout=2 * 60 * 60,
 )
 def train_grpo():
     import os
@@ -65,20 +65,20 @@ def train_grpo():
 
     training_args = GRPOConfig(
         # length limits (which needs to be changed for these to be useful)
-        max_completion_length=1024,
         max_prompt_length=1024,
+        max_completion_length=512,
         # training config, see docstring in GRPOTrainer._get_train_sampler
         # I want a huge number of generations so I can calculate the reward / advantage for all of them
         # Currently, I am forced to have lots of GPUs before I can have a huge number of generations
         # Breaking them down into separate generations is not the same,
         # because that results in a different advantage calculation
-        num_generations=8,
-        per_device_train_batch_size=8,  # num_devices * this_number should be num_generations
-        num_train_epochs=1.0,
+        num_generations=4,
+        per_device_train_batch_size=4,  # num_devices * this_number should be num_generations
         gradient_accumulation_steps=8,
+        num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=1,  # this means reusing completions?
-        output_dir="Qwen2-0.5B-GRPO",
+        output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         logging_steps=16,
         # vllm configs
         use_vllm=True,
@@ -87,7 +87,6 @@ def train_grpo():
         log_completions=True,
     )
     trainer = GRPOTrainer(
-        # model="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
         model=REFERENCE_MODEL_NAME,
         reward_funcs=reward_func,
         args=training_args,
