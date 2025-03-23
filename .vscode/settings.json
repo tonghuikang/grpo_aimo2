@@ -1,0 +1,9 @@
+{
+    "search.exclude": {
+        "**/.venv": false
+    },
+    "files.exclude": {
+        "**/.venv": false
+    },
+    "search.useIgnoreFiles": false
+}

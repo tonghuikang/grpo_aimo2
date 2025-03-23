@@ -11,7 +11,7 @@ image = (
     .add_local_file("./training_dataset.csv", "/root/training_dataset.csv")
 )
 
-GPU = "H100:2"
+GPU = "H100:3"
 app = modal.App("grpo-training", image=image)
 
 
@@ -21,7 +21,7 @@ REFERENCE_MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 import math
 
 
-def length_preference_function(length, preferred_length=500):
+def length_preference_function(length, preferred_length=256):
     x = length / preferred_length
     return math.e * x * math.exp(-x)
 
@@ -40,12 +40,12 @@ def train_grpo():
     import os
     import subprocess
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     subprocess.Popen(
         ["trl", "vllm-serve", "--model", REFERENCE_MODEL_NAME],
         # stdout=subprocess.DEVNULL,  # suppress stdout
     )
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
     # Load tokenizer for scoring use
     from transformers import AutoTokenizer
@@ -61,7 +61,7 @@ def train_grpo():
     import wandb
 
     # Initialize wandb for metrics logging
-    wandb.init(project="grpo-training", name="Qwen2-0.5B")
+    wandb.init(project="grpo-training", name=REFERENCE_MODEL_NAME)
 
     # Define reward function
     import datasets
@@ -105,15 +105,15 @@ def train_grpo():
 
     training_args = GRPOConfig(
         # length limits (which needs to be changed for these to be useful)
-        max_prompt_length=1024,
-        max_completion_length=512,
+        max_prompt_length=2048,
+        max_completion_length=2048,
         # training config, see docstring in GRPOTrainer._get_train_sampler
         # I want a huge number of generations so I can calculate the reward / advantage for all of them
         # Currently, I am forced to have lots of GPUs before I can have a huge number of generations
         # Breaking them down into separate generations is not the same,
         # because that results in a different advantage calculation
         num_generations=8,
-        per_device_train_batch_size=8,  # num_devices * this_number should be num_generations
+        per_device_train_batch_size=4,  # num_devices * this_number should be num_generations
         gradient_accumulation_steps=8,
         num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
