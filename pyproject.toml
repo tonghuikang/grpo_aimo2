@@ -2,13 +2,12 @@
 name = "grpo_example"
 version = "0.1.0"
 description = "GRPO training example"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "ipykernel>=6.29.5",
     "ipython>=8.12.3",
-    "modal>=0.65.66",
-    "trl>=0.15.2",
-    "vllm>=0.5.5",
+    "modal>=0.73.116",
+    "trl==0.16.0",
     "wandb>=0.19.8",
 ]
 

@@ -1,6 +1,5 @@
 ipykernel>=6.29.5
 ipython>=8.12.3
-modal>=0.65.66
-trl>=0.11.4
-vllm>=0.5.5
+modal>=0.73.116
+trl==0.16.0
 wandb>=0.19.8
