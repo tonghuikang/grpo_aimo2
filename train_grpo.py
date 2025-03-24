@@ -83,7 +83,7 @@ if __name__ == "__main__":
             return -1
 
         # attempted answer and is correct
-        return length_preference_function(completion_length)
+        return 0.5 + length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [
