@@ -104,47 +104,46 @@ def is_on_kaggle_submission() -> bool:
 import subprocess
 
 
-def start_vllm_server(
-    model_path,
-    model_name,
-    max_model_len,
-    max_num_seqs,
-    n_gpu=4,
-    cuda_visible_devices="0,1,2,3",
+def start_model(
+    gpu_ids: list[int],
+    model_name: str,
+    model_path: str,
+    max_num_seqs: int,
+    max_model_len: int,
+    port: int,
 ):
-    command = [
-        "python",
-        "/kaggle/input/vllm-serve/vllm_serve.py",
-        "--model-path",
-        model_path,
-        "--model-name",
-        model_name,
-        "--max-model-len",
-        str(max_model_len),
-        "--max-num-seqs",
-        str(max_num_seqs),
-        "--n-gpu",
-        str(n_gpu),
-        "--cuda-visible-devices",
-        cuda_visible_devices,
-    ]
+
+    command = f"""
+    CUDA_VISIBLE_DEVICES={",".join(map(gpu_ids,str))} \
+    python -m vllm.entrypoints.openai.api_server \
+    --served-model-name {model_name} \
+    --model {model_path} \
+    --port {port} \
+    --max_num_seqs {max_num_seqs} \
+    --tensor-parallel-size {len(gpu_ids)} \
+    --max-model-len {max_model_len} \
+    --gpu-memory-utilization 0.90
+    """
 
     stdout_fd = open("vllm_serve.log", "w")
     stderr_fd = open("vllm_serve.err", "w")
 
-    # Start the server process and return immediately
-    process = subprocess.Popen(command, stdout=stdout_fd, stderr=stderr_fd, text=True)
+    # Start the process without blocking
+    process = subprocess.Popen(
+        ["bash", "-c", command], stdout=stdout_fd, stderr=stderr_fd, text=True
+    )
 
     return process
 
 
 if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting vLLM server")
-    process = start_vllm_server(
+    process = start_model(
         model_path=MODEL_PATH,
         model_name=MODEL_NAME,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
+        port=8000,
     )
 else:
     print("Using remote vLLM server")
