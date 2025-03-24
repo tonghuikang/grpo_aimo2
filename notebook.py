@@ -831,13 +831,24 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             break
 
         last_attempted_prompt = prompt
-        stream = client.completions.create(
-            model=MODEL_NAME,
-            prompt=prompt,
-            max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
-            temperature=1.0,
-            stream=True,
-        )
+
+        if not flag_for_training:
+            stream = client.completions.create(
+                model=MODEL_NAME,
+                prompt=prompt,
+                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
+                temperature=1.0,
+                stream=True,
+            )
+        else:
+            stream = client.completions.create(
+                model=MODEL_NAME_SMALL,
+                prompt=prompt,
+                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
+                temperature=1.0,
+                stream=True,
+                stop="```python",
+            )
 
         generation_log = {
             "question": question,
