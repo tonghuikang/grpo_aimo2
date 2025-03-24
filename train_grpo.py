@@ -107,7 +107,7 @@ if __name__ == "__main__":
         per_device_train_batch_size=NUM_GENERATIONS // TRAIN_NUM_GPUS,
         # num_devices * this_number should be num_generations
         gradient_accumulation_steps=1,
-        num_train_epochs=1.0,
+        num_train_epochs=10.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=1,  # this means reusing completions?
         output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",

@@ -34,14 +34,14 @@ cutoff_times.pop()
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:00.138387Z","iopub.execute_input":"2025-03-24T09:46:00.138707Z","iopub.status.idle":"2025-03-24T09:46:00.154718Z","shell.execute_reply.started":"2025-03-24T09:46:00.138687Z","shell.execute_reply":"2025-03-24T09:46:00.154132Z"},"jupyter":{"outputs_hidden":false}}
 # Checklist for GPU commits - LLM_SERVER_URL, INTERNET, ACCELERATOR
 
-MODEL_PATH = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
-MODEL_NAME = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
+MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
+MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
 LLM_SERVER_URL = (
     "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1"
 )
 
-# MODEL_PATH = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1"
-# MODEL_NAME = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
+# MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1"
+# MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
 # LLM_SERVER_URL = (
 #     "https://tonghuikang--example-vllm-openai-compatible-salt1337-32b-serve.modal.run/v1"
 # )
@@ -123,8 +123,8 @@ import subprocess
 
 def start_model(
     gpu_ids: list[int],
-    model_name: str,
-    model_path: str,
+    MODEL_NAME_MAIN: str,
+    MODEL_PATH_MAIN: str,
     max_num_seqs: int,
     max_model_len: int,
     gpu_memory_utilization: float,
@@ -135,8 +135,8 @@ def start_model(
     command = f"""
     CUDA_VISIBLE_DEVICES={",".join(map(str, gpu_ids))} \
     python -m vllm.entrypoints.openai.api_server \
-    --served-model-name {model_name} \
-    --model {model_path} \
+    --served-model-name {MODEL_NAME_MAIN} \
+    --model {MODEL_PATH_MAIN} \
     --port {port} \
     --max_num_seqs {max_num_seqs} \
     --tensor-parallel-size {len(gpu_ids)} \
@@ -159,8 +159,8 @@ if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting main vLLM server")
     process = start_model(
         gpu_ids=[0, 1],
-        model_path=MODEL_PATH,
-        model_name=MODEL_NAME,
+        MODEL_PATH_MAIN=MODEL_PATH_MAIN,
+        MODEL_NAME_MAIN=MODEL_NAME_MAIN,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
         gpu_memory_utilization=0.9,
@@ -170,8 +170,8 @@ if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting small vLLM server")
     process = start_model(
         gpu_ids=[2, 3],
-        model_path=MODEL_PATH_SMALL,
-        model_name=MODEL_NAME_SMALL,
+        MODEL_PATH_MAIN=MODEL_PATH_SMALL,
+        MODEL_NAME_MAIN=MODEL_NAME_SMALL,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
         gpu_memory_utilization=0.9,
@@ -192,12 +192,12 @@ from transformers import AutoTokenizer
 # Loading the tokenizer when vLLM server is starting
 if is_on_kaggle():
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATH,
+        MODEL_PATH_MAIN,
         trust_remote_code=True,
     )
 else:
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_NAME,
+        MODEL_NAME_MAIN,
         trust_remote_code=True,
     )
 
@@ -211,7 +211,7 @@ def count_tokens(text: str) -> int:
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:26.345091Z","iopub.execute_input":"2025-03-24T09:46:26.345454Z","iopub.status.idle":"2025-03-24T09:46:30.722780Z","shell.execute_reply.started":"2025-03-24T09:46:26.345434Z","shell.execute_reply":"2025-03-24T09:46:30.722032Z"},"jupyter":{"outputs_hidden":false}}
 from openai import OpenAI, APIConnectionError
 
-client = OpenAI(base_url=LLM_SERVER_URL, api_key="aimo")
+client_main = OpenAI(base_url=LLM_SERVER_URL, api_key="aimo")
 client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:30.723500Z","iopub.execute_input":"2025-03-24T09:46:30.723726Z","iopub.status.idle":"2025-03-24T09:49:44.809733Z","shell.execute_reply.started":"2025-03-24T09:46:30.723707Z","shell.execute_reply":"2025-03-24T09:49:44.809085Z"},"jupyter":{"outputs_hidden":false}}
@@ -220,7 +220,7 @@ import time
 if is_on_kaggle():
     for _ in range(10 * 60):
         try:
-            print(client.models.list())
+            print(client_main.models.list())
             print(client_small.models.list())
             break
         except APIConnectionError as e:
@@ -833,15 +833,15 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         last_attempted_prompt = prompt
 
         if not flag_for_training:
-            stream = client.completions.create(
-                model=MODEL_NAME,
+            stream = client_main.completions.create(
+                model=MODEL_NAME_MAIN,
                 prompt=prompt,
                 max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
                 temperature=1.0,
                 stream=True,
             )
         else:
-            stream = client.completions.create(
+            stream = client_small.completions.create(
                 model=MODEL_NAME_SMALL,
                 prompt=prompt,
                 max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
@@ -1058,8 +1058,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
         if question != current_question:
             break
 
-        stream = client.completions.create(
-            model=MODEL_NAME,
+        stream = client_main.completions.create(
+            model=MODEL_NAME_MAIN,
             prompt=prompt,
             max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
             temperature=1.0,
