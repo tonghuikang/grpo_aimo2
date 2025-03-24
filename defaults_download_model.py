@@ -11,6 +11,7 @@ DEFAULT_NAME = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
 DEFAULT_NAME = "casperhansen/deepseek-r1-distill-qwen-14b-awq"
 DEFAULT_NAME = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
 DEFAULT_NAME = "Qwen/QwQ-32B-AWQ"
+DEFAULT_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 
 volume = modal.Volume.from_name("aimo2", create_if_missing=True)
 

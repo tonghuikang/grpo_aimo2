@@ -24,13 +24,17 @@ MODEL_NAME = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
 N_GPU = 1
 GPU = modal.gpu.L4(count=N_GPU)
 
+MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+N_GPU = 1
+GPU = "L4:1"
+
 try:
     volume = modal.Volume.lookup("aimo2", create_if_missing=False)
 except modal.exception.NotFoundError:
     raise Exception("Download models first with modal run download_llama.py")
 
 
-app = modal.App("example-vllm-openai-compatible-salt1337-4xl4")
+app = modal.App("example-vllm-openai-compatible-salt1337-1b5")
 
 TOKEN = (
     "super-secret-token"  # auth token. for production use, replace with a modal.Secret
@@ -46,7 +50,7 @@ from argparse import Namespace
 @app.function(
     image=vllm_image,
     gpu=GPU,
-    container_idle_timeout=5 * MINUTES,
+    scaledown_window=5 * MINUTES,
     timeout=24 * HOURS,
     allow_concurrent_inputs=200,
     volumes={MODELS_DIR: volume},

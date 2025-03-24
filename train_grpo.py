@@ -5,6 +5,8 @@ from train_config import (
     TRAIN_CUDA_VISIBLE_DEVICES,
     NUM_GENERATIONS,
     TRAIN_NUM_GPUS,
+    MAX_PROMPT_LENGTH,
+    MAX_COMPLETION_LENGTH,
 )
 
 
@@ -64,9 +66,13 @@ if __name__ == "__main__":
         answer_correct = boxed_content == str(correct_answer)
 
         relevant_index = len(completion)
-        if "```python" in completion:
+        contains_python_opening = "```python" in completion
+        if contains_python_opening:
             relevant_index = completion.index("```python")
         completion_length = len(tokenizer.encode(completion[:relevant_index]))
+
+        if not answer_attempt and not contains_python_opening:
+            return -0.25
 
         if not answer_attempt:
             # penalize long sequences, likely attempting to solve on its own
@@ -90,8 +96,8 @@ if __name__ == "__main__":
 
     training_args = GRPOConfig(
         # length limits (which needs to be changed for these to be useful)
-        max_prompt_length=1024,
-        max_completion_length=1024,
+        max_prompt_length=MAX_PROMPT_LENGTH,
+        max_completion_length=MAX_COMPLETION_LENGTH,
         # training config, see docstring in GRPOTrainer._get_train_sampler
         # I want a huge number of generations so I can calculate the reward / advantage for all of them
         # Currently, I am forced to have lots of GPUs before I can have a huge number of generations
