@@ -36,23 +36,36 @@ cutoff_times.pop()
 
 MODEL_PATH = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
 MODEL_NAME = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
+LLM_SERVER_URL = (
+    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1"
+)
 
 # MODEL_PATH = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1"
 # MODEL_NAME = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
+# LLM_SERVER_URL = (
+#     "https://tonghuikang--example-vllm-openai-compatible-salt1337-32b-serve.modal.run/v1"
+# )
+
+MODEL_PATH_SMALL = "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1"
+MODEL_NAME_SMALL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+LLM_SERVER_URL_SMALL = "https://tonghuikang--example-vllm-openai-compatible-salt1337-1b5-serve.modal.run/v1"
 
 MAX_MODEL_LEN = 8192 * 2
 CODE_EXECUTION_COUNT = 16
 MATH_EXECUTION_COUNT = 0
 
-LLM_SERVER_URL = (
-    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1"
-)
-# LLM_SERVER_URL = "https://tonghuikang--example-vllm-openai-compatible-salt1337-4xl4-serve.modal.run/v1"
-# LLM_SERVER_URL = "http://0.0.0.0:8000/v1"
+LLM_SERVER_URL = "http://0.0.0.0:8000/v1"
+LLM_SERVER_URL_SMALL = "http://0.0.0.0:8001/v1"
 
 N_GPU = 4
 MAX_NUM_SEQS = CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
-USE_LOCAL_LLM = bool(LLM_SERVER_URL == "http://0.0.0.0:8000/v1")
+USE_LOCAL_LLM = (LLM_SERVER_URL == "http://0.0.0.0:8000/v1") and (
+    LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
+)
+
+assert (LLM_SERVER_URL == "http://0.0.0.0:8000/v1") == (
+    LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
+)
 
 import pandas as pd
 
@@ -101,6 +114,11 @@ def is_on_kaggle_submission() -> bool:
 # # vLLM Serving
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:34.367205Z","iopub.execute_input":"2025-03-19T08:43:34.367407Z","iopub.status.idle":"2025-03-19T08:43:34.377358Z","shell.execute_reply.started":"2025-03-19T08:43:34.367389Z","shell.execute_reply":"2025-03-19T08:43:34.376788Z"},"jupyter":{"outputs_hidden":false}}
+import os
+
+os.environ["TRITON_PTXAS_PATH"] = "/usr/local/cuda/bin/ptxas"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import subprocess
 
 
@@ -110,11 +128,13 @@ def start_model(
     model_path: str,
     max_num_seqs: int,
     max_model_len: int,
+    gpu_memory_utilization: float,
+    logfile_suffix: str,
     port: int,
 ):
 
     command = f"""
-    CUDA_VISIBLE_DEVICES={",".join(map(gpu_ids,str))} \
+    CUDA_VISIBLE_DEVICES={",".join(map(str, gpu_ids))} \
     python -m vllm.entrypoints.openai.api_server \
     --served-model-name {model_name} \
     --model {model_path} \
@@ -122,11 +142,11 @@ def start_model(
     --max_num_seqs {max_num_seqs} \
     --tensor-parallel-size {len(gpu_ids)} \
     --max-model-len {max_model_len} \
-    --gpu-memory-utilization 0.90
+    --gpu-memory-utilization {gpu_memory_utilization}
     """
 
-    stdout_fd = open("vllm_serve.log", "w")
-    stderr_fd = open("vllm_serve.err", "w")
+    stdout_fd = open(f"vllm_serve-{logfile_suffix}.log", "w")
+    stderr_fd = open(f"vllm_serve-{logfile_suffix}.err", "w")
 
     # Start the process without blocking
     process = subprocess.Popen(
@@ -139,11 +159,25 @@ def start_model(
 if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting vLLM server")
     process = start_model(
+        gpu_ids=[0, 1, 2, 3],
         model_path=MODEL_PATH,
         model_name=MODEL_NAME,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
+        gpu_memory_utilization=0.75,
+        logfile_suffix="main",
         port=8000,
+    )
+    print("Starting second vLLM server")
+    process = start_model(
+        gpu_ids=[0, 1, 2, 3],
+        model_path=MODEL_PATH,
+        model_name=MODEL_NAME,
+        max_model_len=MAX_MODEL_LEN,
+        max_num_seqs=MAX_NUM_SEQS,
+        gpu_memory_utilization=0.9,
+        logfile_suffix="small",
+        port=8001,
     )
 else:
     print("Using remote vLLM server")
@@ -180,6 +214,7 @@ def count_tokens(text: str) -> int:
 from openai import OpenAI, APIConnectionError
 
 client = OpenAI(base_url=LLM_SERVER_URL, api_key="aimo")
+client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:47:51.266851Z","iopub.execute_input":"2025-03-19T08:47:51.267173Z","iopub.status.idle":"2025-03-19T08:48:54.034972Z","shell.execute_reply.started":"2025-03-19T08:47:51.267147Z","shell.execute_reply":"2025-03-19T08:48:54.034193Z"},"jupyter":{"outputs_hidden":false}}
 import time
@@ -188,6 +223,7 @@ if is_on_kaggle():
     for _ in range(10 * 60):
         try:
             print(client.models.list())
+            print(client_small.models.list())
             break
         except APIConnectionError as e:
             time.sleep(1)
