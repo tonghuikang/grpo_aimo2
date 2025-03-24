@@ -4,7 +4,7 @@
 # - https://www.kaggle.com/code/richolson/ai-math-olympiad-qwen2-5-72b for showing how to submit
 # - https://www.kaggle.com/code/abdullahmeda/load-72b-awq-model-using-vllm-on-l4-x4
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:17.802800Z","iopub.execute_input":"2025-03-19T08:43:17.802989Z","iopub.status.idle":"2025-03-19T08:43:18.889440Z","shell.execute_reply.started":"2025-03-19T08:43:17.802970Z","shell.execute_reply":"2025-03-19T08:43:18.888748Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-24T09:45:57.295897Z","iopub.execute_input":"2025-03-24T09:45:57.296089Z","iopub.status.idle":"2025-03-24T09:45:58.538578Z","shell.execute_reply.started":"2025-03-24T09:45:57.296071Z","shell.execute_reply":"2025-03-24T09:45:58.537951Z"}}
 import os
 import glob
 import shutil
@@ -13,7 +13,7 @@ for file in glob.glob("/kaggle/usr/lib/pip-install-aimo2/triton/backends/nvidia/
     shutil.copy(file, "/usr/local/cuda/bin/")
     os.chmod(f"/usr/local/cuda/bin/{os.path.basename(file)}", 0o755)
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:18.890051Z","iopub.execute_input":"2025-03-19T08:43:18.890256Z","iopub.status.idle":"2025-03-19T08:43:34.268944Z","shell.execute_reply.started":"2025-03-19T08:43:18.890238Z","shell.execute_reply":"2025-03-19T08:43:34.268219Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:45:58.539226Z","iopub.execute_input":"2025-03-24T09:45:58.539430Z","iopub.status.idle":"2025-03-24T09:46:00.137748Z","shell.execute_reply.started":"2025-03-24T09:45:58.539413Z","shell.execute_reply":"2025-03-24T09:46:00.137148Z"},"jupyter":{"outputs_hidden":false}}
 import time
 import pandas as pd
 import polars as pl
@@ -31,7 +31,7 @@ cutoff_times.pop()
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Configs
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:34.269668Z","iopub.execute_input":"2025-03-19T08:43:34.269988Z","iopub.status.idle":"2025-03-19T08:43:34.273472Z","shell.execute_reply.started":"2025-03-19T08:43:34.269968Z","shell.execute_reply":"2025-03-19T08:43:34.272799Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:00.138387Z","iopub.execute_input":"2025-03-24T09:46:00.138707Z","iopub.status.idle":"2025-03-24T09:46:00.154718Z","shell.execute_reply.started":"2025-03-24T09:46:00.138687Z","shell.execute_reply":"2025-03-24T09:46:00.154132Z"},"jupyter":{"outputs_hidden":false}}
 # Checklist for GPU commits - LLM_SERVER_URL, INTERNET, ACCELERATOR
 
 MODEL_PATH = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
@@ -78,7 +78,7 @@ question_to_answer_map: dict[str, str] = dict(
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:34.357906Z","iopub.execute_input":"2025-03-19T08:43:34.358121Z","iopub.status.idle":"2025-03-19T08:43:34.366642Z","shell.execute_reply.started":"2025-03-19T08:43:34.358102Z","shell.execute_reply":"2025-03-19T08:43:34.366024Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:00.155945Z","iopub.execute_input":"2025-03-24T09:46:00.156149Z","iopub.status.idle":"2025-03-24T09:46:00.350206Z","shell.execute_reply.started":"2025-03-24T09:46:00.156131Z","shell.execute_reply":"2025-03-24T09:46:00.349557Z"},"jupyter":{"outputs_hidden":false}}
 import os
 
 # Possible environments
@@ -109,11 +109,10 @@ def is_on_kaggle_commit() -> bool:
 def is_on_kaggle_submission() -> bool:
     return bool(os.getenv("KAGGLE_IS_COMPETITION_RERUN"))
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # vLLM Serving
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:34.367205Z","iopub.execute_input":"2025-03-19T08:43:34.367407Z","iopub.status.idle":"2025-03-19T08:43:34.377358Z","shell.execute_reply.started":"2025-03-19T08:43:34.367389Z","shell.execute_reply":"2025-03-19T08:43:34.376788Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:00.351054Z","iopub.execute_input":"2025-03-24T09:46:00.351257Z","iopub.status.idle":"2025-03-24T09:46:00.369381Z","shell.execute_reply.started":"2025-03-24T09:46:00.351240Z","shell.execute_reply":"2025-03-24T09:46:00.368804Z"},"jupyter":{"outputs_hidden":false}}
 import os
 
 os.environ["TRITON_PTXAS_PATH"] = "/usr/local/cuda/bin/ptxas"
@@ -157,22 +156,22 @@ def start_model(
 
 
 if is_on_kaggle() and USE_LOCAL_LLM:
-    print("Starting vLLM server")
+    print("Starting main vLLM server")
     process = start_model(
-        gpu_ids=[0, 1, 2, 3],
+        gpu_ids=[0, 1],
         model_path=MODEL_PATH,
         model_name=MODEL_NAME,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
-        gpu_memory_utilization=0.75,
+        gpu_memory_utilization=0.9,
         logfile_suffix="main",
         port=8000,
     )
-    print("Starting second vLLM server")
+    print("Starting small vLLM server")
     process = start_model(
-        gpu_ids=[0, 1, 2, 3],
-        model_path=MODEL_PATH,
-        model_name=MODEL_NAME,
+        gpu_ids=[2, 3],
+        model_path=MODEL_PATH_SMALL,
+        model_name=MODEL_NAME_SMALL,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
         gpu_memory_utilization=0.9,
@@ -182,7 +181,7 @@ if is_on_kaggle() and USE_LOCAL_LLM:
 else:
     print("Using remote vLLM server")
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:47:39.941220Z","iopub.execute_input":"2025-03-19T08:47:39.941776Z","iopub.status.idle":"2025-03-19T08:47:40.512097Z","shell.execute_reply.started":"2025-03-19T08:47:39.941743Z","shell.execute_reply":"2025-03-19T08:47:40.511302Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-24T09:46:00.369966Z","iopub.execute_input":"2025-03-24T09:46:00.370148Z","iopub.status.idle":"2025-03-24T09:46:26.344450Z","shell.execute_reply.started":"2025-03-24T09:46:00.370132Z","shell.execute_reply":"2025-03-24T09:46:26.343739Z"}}
 import os
 from typing import Optional
 
@@ -209,14 +208,13 @@ def count_tokens(text: str) -> int:
     # You can ignore the warning
     return len(tokenizer.encode(text))
 
-
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:43:34.377895Z","iopub.execute_input":"2025-03-19T08:43:34.378079Z","iopub.status.idle":"2025-03-19T08:43:40.006015Z","shell.execute_reply.started":"2025-03-19T08:43:34.378063Z","shell.execute_reply":"2025-03-19T08:43:40.005303Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:26.345091Z","iopub.execute_input":"2025-03-24T09:46:26.345454Z","iopub.status.idle":"2025-03-24T09:46:30.722780Z","shell.execute_reply.started":"2025-03-24T09:46:26.345434Z","shell.execute_reply":"2025-03-24T09:46:30.722032Z"},"jupyter":{"outputs_hidden":false}}
 from openai import OpenAI, APIConnectionError
 
 client = OpenAI(base_url=LLM_SERVER_URL, api_key="aimo")
 client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:47:51.266851Z","iopub.execute_input":"2025-03-19T08:47:51.267173Z","iopub.status.idle":"2025-03-19T08:48:54.034972Z","shell.execute_reply.started":"2025-03-19T08:47:51.267147Z","shell.execute_reply":"2025-03-19T08:48:54.034193Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-24T09:46:30.723500Z","iopub.execute_input":"2025-03-24T09:46:30.723726Z","iopub.status.idle":"2025-03-24T09:49:44.809733Z","shell.execute_reply.started":"2025-03-24T09:46:30.723707Z","shell.execute_reply":"2025-03-24T09:49:44.809085Z"},"jupyter":{"outputs_hidden":false}}
 import time
 
 if is_on_kaggle():
@@ -730,7 +728,6 @@ def truncate_paragraph(output):
         output_new = output_new[:5000] + "[truncated]" + output_new[-5000:]
     return output_new
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Code worker
 
@@ -1004,7 +1001,6 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Math worker
 
@@ -1120,7 +1116,6 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
         generation_logs[question].extend(generation_logs_local)
 
     return answer
-
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Control logic
@@ -1298,7 +1293,6 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     cutoff_times.pop()
     return answer  # Note: Do NOT return early, we NEED to pop cutoff_times
 
-
 # %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:50:17.432000Z","iopub.execute_input":"2025-03-19T08:50:17.432323Z","iopub.status.idle":"2025-03-19T08:50:17.436887Z","shell.execute_reply.started":"2025-03-19T08:50:17.432293Z","shell.execute_reply":"2025-03-19T08:50:17.436169Z"}}
 import pandas as pd
 import polars as pl
@@ -1321,7 +1315,6 @@ def predict(
     answer: int = predict_for_question(question)
     print("------\n\n\n")
     return pl.DataFrame({"id": id_, "answer": answer})
-
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Local tests
