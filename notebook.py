@@ -32,17 +32,17 @@ cutoff_times.pop()
 # # Configs
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.529649Z","iopub.execute_input":"2025-03-25T02:51:44.529983Z","iopub.status.idle":"2025-03-25T02:51:44.551380Z","shell.execute_reply.started":"2025-03-25T02:51:44.529963Z","shell.execute_reply":"2025-03-25T02:51:44.550690Z"},"jupyter":{"outputs_hidden":false}}
-# Checklist for GPU commits - LLM_SERVER_URL, INTERNET, ACCELERATOR
+# Checklist for GPU commits - LLM_SERVER_URL_MAIN, INTERNET, ACCELERATOR
 
 MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
 MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
-LLM_SERVER_URL = (
+LLM_SERVER_URL_MAIN = (
     "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1"
 )
 
 # MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1"
 # MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
-# LLM_SERVER_URL = (
+# LLM_SERVER_URL_MAIN = (
 #     "https://tonghuikang--example-vllm-openai-compatible-salt1337-32b-serve.modal.run/v1"
 # )
 
@@ -54,16 +54,16 @@ MAX_MODEL_LEN = 8192 * 2
 CODE_EXECUTION_COUNT = 16
 MATH_EXECUTION_COUNT = 0
 
-LLM_SERVER_URL = "http://0.0.0.0:8000/v1"
+LLM_SERVER_URL_MAIN = "http://0.0.0.0:8000/v1"
 LLM_SERVER_URL_SMALL = "http://0.0.0.0:8001/v1"
 
 N_GPU = 4
 MAX_NUM_SEQS = CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
-USE_LOCAL_LLM = (LLM_SERVER_URL == "http://0.0.0.0:8000/v1") and (
+USE_LOCAL_LLM = (LLM_SERVER_URL_MAIN == "http://0.0.0.0:8000/v1") and (
     LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
 )
 
-assert (LLM_SERVER_URL == "http://0.0.0.0:8000/v1") == (
+assert (LLM_SERVER_URL_MAIN == "http://0.0.0.0:8000/v1") == (
     LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
 )
 
@@ -123,8 +123,8 @@ import subprocess
 
 def start_model(
     gpu_ids: list[int],
-    MODEL_NAME_MAIN: str,
-    MODEL_PATH_MAIN: str,
+    model_name: str,
+    model_path: str,
     max_num_seqs: int,
     max_model_len: int,
     gpu_memory_utilization: float,
@@ -135,13 +135,13 @@ def start_model(
     command = f"""
     CUDA_VISIBLE_DEVICES={",".join(map(str, gpu_ids))} \
     python -m vllm.entrypoints.openai.api_server \
-    --served-model-name {MODEL_NAME_MAIN} \
-    --model {MODEL_PATH_MAIN} \
+    --served-model-name {model_name} \
+    --model {model_path} \
     --port {port} \
     --max_num_seqs {max_num_seqs} \
     --tensor-parallel-size {len(gpu_ids)} \
     --max-model-len {max_model_len} \
-    --gpu-memory-utilization {gpu_memory_utilization}
+    --gpu-memory-utilization {gpu_memory_utilization} \
     """
 
     stdout_fd = open(f"vllm_serve-{logfile_suffix}.log", "w")
@@ -184,6 +184,7 @@ if is_on_kaggle():
         MODEL_PATH_MAIN,
         trust_remote_code=True,
     )
+    print("Tokenizer loaded")
 else:
     tokenizer = AutoTokenizer.from_pretrained(
         MODEL_NAME_MAIN,
@@ -200,7 +201,7 @@ def count_tokens(text: str) -> int:
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:19.924092Z","iopub.execute_input":"2025-03-25T02:52:19.924498Z","iopub.status.idle":"2025-03-25T02:52:27.404922Z","shell.execute_reply.started":"2025-03-25T02:52:19.924475Z","shell.execute_reply":"2025-03-25T02:52:27.404188Z"},"jupyter":{"outputs_hidden":false}}
 from openai import OpenAI, APIConnectionError
 
-client_main = OpenAI(base_url=LLM_SERVER_URL, api_key="aimo")
+client_main = OpenAI(base_url=LLM_SERVER_URL_MAIN, api_key="aimo")
 client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:27.405618Z","iopub.execute_input":"2025-03-25T02:52:27.405833Z"},"jupyter":{"outputs_hidden":false}}
@@ -221,6 +222,17 @@ if is_on_kaggle():
                 logfile_suffix="small",
                 port=8001,
             )
+            break
+        except APIConnectionError as e:
+            time.sleep(1)
+    else:
+        if not is_on_kaggle_submission():
+            raise
+
+if is_on_kaggle():
+    for _ in range(10 * 60):
+        try:
+            print(client_small.models.list())
             break
         except APIConnectionError as e:
             time.sleep(1)
