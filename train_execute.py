@@ -46,6 +46,7 @@ app = modal.App("grpo-training", image=image)
 )
 def train_grpo():
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = (
         VLLM_CUDA_VISIBLE_DEVICES + "," + TRAIN_CUDA_VISIBLE_DEVICES
     )
@@ -63,8 +64,33 @@ def train_grpo():
     file_path = "/usr/local/lib/python3.11/site-packages/trl/scripts/vllm_serve.py"
     with open(file_path, "r") as file:
         content = file.read()
-    print("index", content.index("n=request.n,"))
-    modified_content = content.replace("n=request.n,", 'n=request.n, stop="```python",')
+    old_string = "n=request.n,"
+    print("index", content.index(old_string))
+    modified_content = content.replace(old_string, f'{old_string} stop="```python",')
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/grpo_trainer.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = '"reward": rewards.tolist(),'
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f'{old_string} "advantage": advantages_to_log,',
+    )
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/grpo_trainer.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = "advantages = rewards - mean_grouped_rewards"
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f"{old_string}; advantages_to_log = advantages.tolist();",
+    )
     with open(file_path, "w") as file:
         file.write(modified_content)
 

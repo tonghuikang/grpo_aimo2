@@ -112,6 +112,8 @@ if __name__ == "__main__":
         num_iterations=4,
         output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         logging_steps=1,
+        lr_scheduler_type="cosine",
+        learning_rate=1e-5,
         epsilon_high=0.28,
         scale_rewards=False,
         # vllm configs
