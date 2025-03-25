@@ -89,7 +89,7 @@ def train_grpo():
     print("index", content.index(old_string))
     modified_content = content.replace(
         old_string,
-        f"{old_string}; advantages_to_log = advantages.tolist();",
+        f"{old_string}; advantages_to_log = advantages.tolist(); [print(val.tolist()) for val in [rewards, advantages] if self.accelerator.is_main_process];",
     )
     with open(file_path, "w") as file:
         file.write(modified_content)
