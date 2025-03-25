@@ -52,9 +52,11 @@ if __name__ == "__main__":
 
     import math
 
-    def length_preference_function(length, preferred_length=256):
+    def length_preference_function(length, preferred_length=256, ceiling=1.0):
+        # maps [0,inf] -> [0,1]
         x = length / preferred_length
-        return math.e * x * math.exp(-x)
+        y = math.e * x * math.exp(-x)
+        return (min(y, ceiling))**(1/3) / ceiling
 
     import re
 
