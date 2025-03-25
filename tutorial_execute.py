@@ -41,7 +41,7 @@ def reward_len(completions, **kwargs):
 
 app = modal.App("grpo-training", image=image)
 
-GPU = "H100:2"
+GPU = "L4:2"
 
 
 import os
