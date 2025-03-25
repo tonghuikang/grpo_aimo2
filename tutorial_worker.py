@@ -14,7 +14,7 @@ def main():
     num_iterations = 4
     training_args = GRPOConfig(
         output_dir=f"Qwen2.5-0.5B-GRPO-2899-μ={num_iterations}",
-        logging_steps=5,
+        logging_steps=1,
         gradient_accumulation_steps=4,
         per_device_train_batch_size=4,
         num_generations=8,
@@ -23,6 +23,7 @@ def main():
         log_completions=True,
         max_steps=200,
         num_iterations=num_iterations,
+        report_to="wandb",
     )
     trainer = GRPOTrainer(
         model="Qwen/Qwen2.5-0.5B",
