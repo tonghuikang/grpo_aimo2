@@ -109,6 +109,7 @@ def is_on_kaggle_commit() -> bool:
 def is_on_kaggle_submission() -> bool:
     return bool(os.getenv("KAGGLE_IS_COMPETITION_RERUN"))
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # vLLM Serving
 
@@ -197,6 +198,7 @@ def count_tokens(text: str) -> int:
     # "Token indices sequence length is longer than the specified maximum sequence length"
     # You can ignore the warning
     return len(tokenizer.encode(text))
+
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:19.924092Z","iopub.execute_input":"2025-03-25T02:52:19.924498Z","iopub.status.idle":"2025-03-25T02:52:27.404922Z","shell.execute_reply.started":"2025-03-25T02:52:19.924475Z","shell.execute_reply":"2025-03-25T02:52:27.404188Z"},"jupyter":{"outputs_hidden":false}}
 from openai import OpenAI, APIConnectionError
@@ -739,6 +741,7 @@ def truncate_paragraph(output):
         output_new = output_new[:5000] + "[truncated]" + output_new[-5000:]
     return output_new
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Code worker
 
@@ -1023,6 +1026,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Math worker
 
@@ -1138,6 +1142,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
         generation_logs[question].extend(generation_logs_local)
 
     return answer
+
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Control logic
@@ -1315,6 +1320,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     cutoff_times.pop()
     return answer  # Note: Do NOT return early, we NEED to pop cutoff_times
 
+
 # %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:50:17.432000Z","iopub.execute_input":"2025-03-19T08:50:17.432323Z","iopub.status.idle":"2025-03-19T08:50:17.436887Z","shell.execute_reply.started":"2025-03-19T08:50:17.432293Z","shell.execute_reply":"2025-03-19T08:50:17.436169Z"}}
 import pandas as pd
 import polars as pl
@@ -1337,6 +1343,7 @@ def predict(
     answer: int = predict_for_question(question)
     print("------\n\n\n")
     return pl.DataFrame({"id": id_, "answer": answer})
+
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Local tests
