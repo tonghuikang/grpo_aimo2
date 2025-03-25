@@ -25,9 +25,7 @@ image = (
     .pip_install(  # add flash-attn
         "flash-attn==2.7.4.post1", extra_options="--no-build-isolation"
     )
-    .add_local_file("./train_grpo.py", "/root/train_grpo.py")
-    .add_local_file("./train_config.py", "/root/train_config.py")
-    .add_local_file("./training_dataset.csv", "/root/training_dataset.csv")
+    .add_local_file("./tutorial_worker.py", "/root/tutorial_worker.py")
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")  # for wandb credentials
     .add_local_file("/Users/htong/.kaggle/kaggle.json", "/root/kaggle/kaggle.json")
 )
@@ -43,7 +41,11 @@ def reward_len(completions, **kwargs):
 
 app = modal.App("grpo-training", image=image)
 
-GPU = "H100:1"
+GPU = "H100:2"
+
+
+import os
+import subprocess
 
 
 @app.function(
@@ -52,26 +54,18 @@ GPU = "H100:1"
     timeout=2 * 60 * 60,
 )
 def train():
-    num_iterations = 4
-    training_args = GRPOConfig(
-        output_dir=f"Qwen2.5-0.5B-GRPO-2899-μ={num_iterations}",
-        logging_steps=5,
-        gradient_accumulation_steps=4,
-        per_device_train_batch_size=4,
-        num_generations=8,
-        max_prompt_length=64,
-        max_completion_length=64,
-        log_completions=True,
-        max_steps=200,
-        num_iterations=num_iterations,
+    # Launch training
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+    subprocess.run(
+        [
+            "accelerate",
+            "launch",
+            "--num_processes",
+            "2",
+            "tutorial_worker.py",
+        ],
+        # stdout=subprocess.DEVNULL,  # suppress stdout
     )
-    trainer = GRPOTrainer(
-        model="Qwen/Qwen2.5-0.5B",
-        reward_funcs=reward_len,
-        args=training_args,
-        train_dataset=dataset,
-    )
-    trainer.train()
 
 
 @app.local_entrypoint()
