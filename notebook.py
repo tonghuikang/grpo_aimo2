@@ -159,11 +159,11 @@ if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting main vLLM server")
     process = start_model(
         gpu_ids=[0, 1, 2, 3],
-        MODEL_PATH_MAIN=MODEL_PATH_MAIN,
-        MODEL_NAME_MAIN=MODEL_NAME_MAIN,
+        model_path=MODEL_PATH_MAIN,
+        model_name=MODEL_NAME_MAIN,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
-        gpu_memory_utilization=0.5,
+        gpu_memory_utilization=0.40,
         logfile_suffix="main",
         port=8000,
     )
@@ -208,17 +208,17 @@ client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
 import time
 
 if is_on_kaggle():
-    for _ in range(10 * 60):
+    for _ in range(5 * 60):
         try:
             print(client_main.models.list())
             print("Starting small vLLM server")
             process = start_model(
                 gpu_ids=[0, 1, 2, 3],
-                MODEL_PATH_MAIN=MODEL_PATH_SMALL,
-                MODEL_NAME_MAIN=MODEL_NAME_SMALL,
+                model_path=MODEL_PATH_SMALL,
+                model_name=MODEL_NAME_SMALL,
                 max_model_len=MAX_MODEL_LEN,
                 max_num_seqs=MAX_NUM_SEQS,
-                gpu_memory_utilization=0.8,
+                gpu_memory_utilization=0.30,
                 logfile_suffix="small",
                 port=8001,
             )
@@ -230,7 +230,7 @@ if is_on_kaggle():
             raise
 
 if is_on_kaggle():
-    for _ in range(10 * 60):
+    for _ in range(5 * 60):
         try:
             print(client_small.models.list())
             break
@@ -865,7 +865,6 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "code",
             "generation_idx": generation_idx,
-            "timestamp": time.time() - question_start_time,
             "elapsed": prompt,
             "flag_for_training": flag_for_training,
         }
@@ -992,6 +991,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             generation_log["code"] = code
             generation_log["reason"] = "stop_token"
 
+        generation_log["timestamp"] = time.time() - question_start_time
         generation_logs_local.append(generation_log)
         stream.close()
 
@@ -1233,7 +1233,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
     if selected_questions_only and not is_on_kaggle_submission():
-        if "Fred" not in question:
+        if "Fred" not in question and "Triangle" not in question:
             return 210
         # if "Triangle" not in question:
         #     return 210
