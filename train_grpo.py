@@ -72,18 +72,18 @@ if __name__ == "__main__":
         completion_length = len(tokenizer.encode(completion[:relevant_index]))
 
         if not answer_attempt and not contains_python_opening:
-            return -0.25
+            return -0.75
 
         if not answer_attempt:
             # penalize long sequences, likely attempting to solve on its own
             # not sure if it affects the math sequences
-            return -0.5 + 0.5 * length_preference_function(completion_length)
+            return -0.5 + length_preference_function(completion_length)
 
         if not answer_correct:
             return -1
 
         # attempted answer and is correct
-        return 0.5 + length_preference_function(completion_length)
+        return 0.5 + 2 * length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         num_generations=NUM_GENERATIONS,
         per_device_train_batch_size=NUM_GENERATIONS // TRAIN_NUM_GPUS,
         # num_devices * this_number should be num_generations
-        gradient_accumulation_steps=1,
+        gradient_accumulation_steps=4,
         num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=4,
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         logging_steps=1,
         lr_scheduler_type="cosine",
         warmup_steps=8,
-        learning_rate=1e-4,
+        learning_rate=3e-4,
         epsilon_high=0.28,
         scale_rewards=False,
         # vllm configs
