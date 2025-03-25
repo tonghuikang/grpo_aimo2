@@ -94,6 +94,30 @@ def train_grpo():
     with open(file_path, "w") as file:
         file.write(modified_content)
 
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/utils.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = 'header_style="bold white", expand=True'
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f"{old_string}, width=290",
+    )
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/utils.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = 'Console('
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f"{old_string}width=300",
+    )
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
     # Start vllm server as a background process
     import os
     import subprocess
