@@ -873,9 +873,6 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     token_counter = 0
 
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
-        answer = extract_boxed_text(redact_sections(prompt))
-        if answer and is_valid_answer_string(answer):
-            break
         if question != current_question:
             break
         if request_counter > 20:
@@ -908,6 +905,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "generation_idx": generation_idx,
             "elapsed": prompt,
             "flag_for_training": flag_for_training,
+            "reason": "unassigned",
         }
         flag_for_training = False
 
@@ -957,6 +955,15 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                         valid_prefix,
                         generation_idx=generation_idx,
                     )
+                    for _ in range(5):
+                        # possible that truncating prefix will cause the code to be invalid
+                        # might need to keep truncating exec_valid_prefix
+                        is_successful_in_retry, _, _, exec_valid_prefix = execute_code(
+                            exec_valid_prefix,
+                            generation_idx=generation_idx,
+                        )
+                        if is_successful_in_retry:
+                            break
                     time_until_executing_again = time.time() + 5
                     if (
                         not is_successful
@@ -1034,11 +1041,13 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             generation_log["code"] = code
             generation_log["reason"] = "stop_token"
 
-            if answer := extract_boxed_text(redact_sections(prompt)):
-                if not (answer and is_valid_answer_string(answer)):
-                    generation_log["injected"] = code_output_chunk
-                    flag_for_training = True
-                    add_text_chunk(code_output_chunk, reset_buffer=True)
+            answer = extract_boxed_text(redact_sections(prompt))
+            if answer and is_valid_answer_string(answer):
+                break
+
+            generation_log["injected"] = code_output_chunk
+            flag_for_training = True
+            add_text_chunk(code_output_chunk, reset_buffer=True)
 
         generation_log["timestamp"] = time.time() - question_start_time
         generation_log["request_counter"] = request_counter
@@ -1061,7 +1070,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "request_counter": request_counter,
             "token_counter": token_counter,
             "flag_for_training": False,
-            "reason": "final",
+            "reason": "final" if question == current_question else "terminated",
         }
     )
     for generation_log in generation_logs_local:
