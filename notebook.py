@@ -39,8 +39,11 @@ MODEL_PATHS: list[str] = [
     "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # math
     "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
 ]
+
 MODEL_NAMES: list[str] = [
     "casperhansen/deepseek-r1-distill-qwen-7b-awq",
+    "casperhansen/deepseek-r1-distill-qwen-7b-awq",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
 ]
 
 LLM_SERVER_URLS: list[str] = [
@@ -186,7 +189,7 @@ if is_on_kaggle() and USE_LOCAL_LLM:
         model_path=MODEL_PATHS[config_idx],
         model_name=MODEL_NAMES[config_idx],
         max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+        max_num_seqs=max(1, CODE_EXECUTION_COUNT),
         gpu_memory_utilization=0.90,
         logfile_suffix="code",
         port=PORT_IDS[config_idx],
@@ -199,7 +202,7 @@ if is_on_kaggle() and USE_LOCAL_LLM:
         model_path=MODEL_PATHS[config_idx],
         model_name=MODEL_NAMES[config_idx],
         max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+        max_num_seqs=max(1, CODE_EXECUTION_COUNT),
         gpu_memory_utilization=0.90,
         logfile_suffix="clf",
         port=PORT_IDS[config_idx],
@@ -248,7 +251,9 @@ client_clf = OpenAI(base_url=LLM_SERVER_URLS[2], api_key="aimo")
 import time
 
 if is_on_kaggle():
-    for _ in range(5 * 60):
+    num_retries_to_load = 10 * 60
+    while num_retries_to_load > 0:
+        num_retries_to_load -= 1
         try:
             print(client_math.models.list())
             print(client_code.models.list())
@@ -256,8 +261,9 @@ if is_on_kaggle():
             break
         except APIConnectionError as e:
             time.sleep(1)
-            if not is_on_kaggle_submission():
-                raise
+            if num_retries_to_load == 0:
+                if not is_on_kaggle_submission():
+                    raise
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Helper functions
