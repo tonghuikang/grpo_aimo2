@@ -78,13 +78,6 @@ MATH_EXECUTION_COUNT = 16
 
 N_GPU = 4
 
-import pandas as pd
-
-REFERENCE_CSV = "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
-df_reference = pd.read_csv(REFERENCE_CSV)
-question_to_answer_map: dict[str, str] = dict(
-    zip(df_reference["problem"], df_reference["answer"])
-)
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
@@ -120,6 +113,20 @@ def is_on_kaggle_commit() -> bool:
 def is_on_kaggle_submission() -> bool:
     return bool(os.getenv("KAGGLE_IS_COMPETITION_RERUN"))
 
+
+import pandas as pd
+
+if is_on_kaggle():
+    REFERENCE_CSV = (
+        "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
+    )
+else:
+    REFERENCE_CSV = "./reference.csv"
+
+df_reference = pd.read_csv(REFERENCE_CSV)
+question_to_answer_map: dict[str, str] = dict(
+    zip(df_reference["problem"], df_reference["answer"])
+)
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # vLLM Serving
@@ -347,7 +354,8 @@ from sympy import *
 if True:
     if True:
         # avoid getting processed by process_code
-        distance = lambda a,b: abs(a - b)
+        def distance(a,b):
+            return abs(a - b)
         print2_count = 20
         builtins_pow = builtins.pow
 
@@ -431,7 +439,6 @@ def find_syntax_error(code_string: str) -> Optional[str]:
     showing the code up to the error with error indicator.
     """
     import ast
-    from typing import Optional
 
     try:
         ast.parse(code_string)
@@ -458,6 +465,12 @@ import sympy
 import ast
 
 
+import builtins
+
+builtin_names = set(dir(builtins))
+print(builtin_names)
+
+
 def find_potential_name_errors(tree: ast.Module) -> list[str]:
     """
     Analyze Python AST to find potential NameError issues.
@@ -468,9 +481,6 @@ def find_potential_name_errors(tree: ast.Module) -> list[str]:
     # Note: does not work with import *
     defined_names = set(sympy.__all__)
     used_names = set()
-
-    # Built-in names that shouldn't trigger NameError
-    builtins = set(dir(__builtins__))
 
     # Visitor to collect name information
     class NameVisitor(ast.NodeVisitor):
@@ -522,7 +532,7 @@ def find_potential_name_errors(tree: ast.Module) -> list[str]:
     visitor.visit(tree)
 
     # Find potential NameErrors (used but not defined or built-in)
-    potential_name_errors = used_names - defined_names - builtins
+    potential_name_errors = used_names - defined_names - builtin_names
 
     return list(potential_name_errors)
 
@@ -943,7 +953,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                         break
 
                     # code execution check at 5 second intervals
-                    is_successful, _, code_output, exec_valid_prefix = execute_code(
+                    is_successful, _, _, exec_valid_prefix = execute_code(
                         valid_prefix,
                         generation_idx=generation_idx,
                     )
@@ -958,10 +968,11 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                             transformed_prefix = process_code(transformed_prefix)
                         except:
                             transformed_prefix = valid_prefix
-                        is_successful_transformed, stdout, _, _ = execute_code(
+                        is_successful_transformed, code_output, _, _ = execute_code(
                             transformed_prefix,
                             generation_idx=generation_idx,
                         )
+                        code_output = truncate_paragraph(code_output)
                         if is_successful_transformed:
                             # the code is actually okay if we convert to integers
                             continue
@@ -981,9 +992,9 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                         # inject results from intermediate values
                         _, suffix, _ = longest_valid_prefix(exec_valid_prefix)
                         # to account for multiline list definition
-                        new_stdout = stdout.lstrip(seen_stdout)
+                        new_stdout = code_output.lstrip(seen_stdout)
                         if not suffix.strip() and new_stdout.strip():
-                            seen_stdout = stdout
+                            seen_stdout = code_output
                             text_chunk_to_add = (
                                 '\n\n"""\n# The code above was executed and these are the values:\n'
                                 + new_stdout
@@ -1108,10 +1119,16 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
         prompt += chunk_text
         buffer += chunk_text
 
+    request_counter = 0
+    token_counter = 0
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
         if question != current_question:
             break
 
+        if request_counter > 20:
+            break
+
+        request_counter += 1
         stream = client_math.completions.create(
             model=MODEL_NAMES[0],
             prompt=prompt,
@@ -1122,6 +1139,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
 
         for chunk in stream:
             chunk_text = chunk.choices[0].text
+            token_counter += 1
 
             add_chunk(chunk_text)
 
@@ -1143,6 +1161,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
                 "timestamp": time.time() - start_time,
                 "prompt": prompt,
                 "buffer": buffer,
+                "request_counter": request_counter,
+                "token_counter": token_counter,
                 "flag_for_training": False,
                 "reason": "stream_complete",
             }
@@ -1164,6 +1184,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
             "timestamp": time.time() - start_time,
             "prompt": prompt,
             "buffer": buffer,
+            "request_counter": request_counter,
+            "token_counter": token_counter,
             "flag_for_training": False,
             "reason": "final",
         }
