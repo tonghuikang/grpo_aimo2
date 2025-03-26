@@ -97,7 +97,7 @@ if __name__ == "__main__":
     from trl import GRPOConfig, GRPOTrainer
 
     learning_rate = 3e-5
-    num_iterations = 8
+    num_iterations = 7
 
     training_args = GRPOConfig(
         # length limits (which needs to be changed for these to be useful)
@@ -112,15 +112,16 @@ if __name__ == "__main__":
         per_device_train_batch_size=NUM_GENERATIONS // TRAIN_NUM_GPUS,
         # num_devices * this_number should be num_generations
         gradient_accumulation_steps=num_iterations,
-        num_train_epochs=1.0,
+        num_train_epochs=4.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=num_iterations,
         output_dir=f"DeepSeek-R1-Distill-Qwen-1.5B-GRPO-{num_iterations}-{learning_rate:.0e}",
         logging_steps=1,
         lr_scheduler_type="cosine",
-        warmup_steps=8,
+        warmup_steps=7,
         learning_rate=3e-5,
         epsilon_high=0.28,
+        beta=0.1,
         scale_rewards=False,
         # vllm configs
         use_vllm=True,
