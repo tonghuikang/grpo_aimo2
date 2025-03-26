@@ -164,7 +164,7 @@ if is_on_kaggle() and USE_LOCAL_LLM:
         model_name=MODEL_NAME_MAIN,
         max_model_len=MAX_MODEL_LEN,
         max_num_seqs=MAX_NUM_SEQS,
-        gpu_memory_utilization=0.40,
+        gpu_memory_utilization=0.90,
         logfile_suffix="main",
         port=8000,
     )
@@ -220,7 +220,7 @@ if is_on_kaggle():
                 model_name=MODEL_NAME_SMALL,
                 max_model_len=MAX_MODEL_LEN,
                 max_num_seqs=MAX_NUM_SEQS,
-                gpu_memory_utilization=0.30,
+                gpu_memory_utilization=0.90,
                 logfile_suffix="small",
                 port=8001,
             )
