@@ -873,6 +873,9 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     token_counter = 0
 
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
+        answer = extract_boxed_text(redact_sections(prompt))
+        if answer and is_valid_answer_string(answer):
+            break
         if question != current_question:
             break
         if request_counter > 20:
@@ -1041,13 +1044,10 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             generation_log["code"] = code
             generation_log["reason"] = "stop_token"
 
-            answer = extract_boxed_text(redact_sections(prompt))
-            if answer and is_valid_answer_string(answer):
-                break
-
-            generation_log["injected"] = code_output_chunk
-            flag_for_training = True
-            add_text_chunk(code_output_chunk, reset_buffer=True)
+            if not buffer.strip().endswith("```python"):
+                reset_chunk = "<｜end▁of▁sentence｜>" + code_initial_prompt
+                generation_log["injected"] = reset_chunk
+                add_text_chunk(reset_chunk, reset_buffer=True)
 
         generation_log["timestamp"] = time.time() - question_start_time
         generation_log["request_counter"] = request_counter
