@@ -21,11 +21,10 @@ import numpy as np
 
 pd.set_option("display.max_colwidth", None)
 start_time = time.time()
-question_start_time = time.time()
 final_cutoff_time = start_time + (4 * 60 + 45) * 60  # 4.75 hours from start time
 cutoff_times = [
-    int(x) for x in np.linspace(final_cutoff_time, start_time + 5 * 60, 50 + 1)
-]  # 5 minutes loading time at the start
+    int(x) for x in np.linspace(final_cutoff_time, start_time + 4 * 60, 50 + 1)
+]  # 4 minutes loading time at the start
 cutoff_times.pop()
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
@@ -52,7 +51,7 @@ LLM_SERVER_URLS: list[str] = [
     "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
 ]
 
-PORT_IDS: list[str] = [
+PORT_IDS: list[int] = [
     8000,
     8001,
     8002,
@@ -75,8 +74,6 @@ USE_LOCAL_LLM = "0.0.0.0" in LLM_SERVER_URLS[0]
 MAX_MODEL_LEN = 8192 * 2
 CODE_EXECUTION_COUNT = 12
 MATH_EXECUTION_COUNT = 16
-
-N_GPU = 4
 
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
@@ -586,7 +583,6 @@ def longest_valid_prefix(code_string: str) -> tuple[str, str, list[str]]:
 def transform_code(code: str) -> str:
     """Transform integer literals to Integer() calls while preserving formatting and comments."""
     import ast
-    import re
 
     # Step 1: Parse the code to identify the structure
     tree = ast.parse(code)
@@ -842,6 +838,8 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     global code_results
     global generation_logs
     import time
+
+    question_start_time = time.time()
 
     # ----- Buffer Management -----
     prompt = code_initial_prompt.format(question=question)
@@ -1116,6 +1114,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
     global generation_logs
     import time
 
+    question_start_time = time.time()
+
     # ----- Math Execution -----
     prompt: str = math_initial_prompt.format(question=question)
     buffer: str = ""
@@ -1167,7 +1167,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
                 "question": question,
                 "method": "math",
                 "generation_idx": generation_idx,
-                "timestamp": time.time() - start_time,
+                "timestamp": time.time() - question_start_time,
                 "prompt": prompt,
                 "buffer": buffer,
                 "request_counter": request_counter,
@@ -1190,7 +1190,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
             "question": question,
             "method": "math",
             "generation_idx": generation_idx,
-            "timestamp": time.time() - start_time,
+            "timestamp": time.time() - question_start_time,
             "prompt": prompt,
             "buffer": buffer,
             "request_counter": request_counter,
@@ -1294,7 +1294,7 @@ results_lock = threading.Lock()  # Thread lock for protecting shared results
 
 
 def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
-    global math_results, code_results, generation_logs, current_question, question_start_time
+    global math_results, code_results, generation_logs, current_question
     import time
 
     # Reset global result arrays
@@ -1303,7 +1303,6 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         code_results[question] = []
         generation_logs[question] = []
         current_question = question
-        question_start_time = time.time()
 
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
@@ -1427,7 +1426,6 @@ if is_on_kaggle_interactive():
         math_results[question_sample] = []
         code_results[question_sample] = []
         generation_logs[question_sample] = []
-        question_start_time = time.time()
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:50:34.208896Z","iopub.execute_input":"2025-03-19T08:50:34.209197Z","iopub.status.idle":"2025-03-19T08:52:22.152911Z","shell.execute_reply.started":"2025-03-19T08:50:34.209171Z","shell.execute_reply":"2025-03-19T08:52:22.152191Z"},"jupyter":{"outputs_hidden":false}}
 if is_on_kaggle_interactive():
