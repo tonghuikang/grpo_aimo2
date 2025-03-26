@@ -56,7 +56,7 @@ if __name__ == "__main__":
         # maps [0,inf] -> [0,1]
         x = length / preferred_length
         y = math.e * x * math.exp(-x)
-        return (min(y, ceiling))**(1/3) / ceiling
+        return (min(y, ceiling)) ** (1 / 3) / ceiling
 
     import re
 

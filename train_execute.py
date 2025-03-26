@@ -109,7 +109,7 @@ def train_grpo():
     file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/utils.py"
     with open(file_path, "r") as file:
         content = file.read()
-    old_string = 'Console('
+    old_string = "Console("
     print("index", content.index(old_string))
     modified_content = content.replace(
         old_string,

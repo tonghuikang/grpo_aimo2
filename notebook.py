@@ -34,38 +34,46 @@ cutoff_times.pop()
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.529649Z","iopub.execute_input":"2025-03-25T02:51:44.529983Z","iopub.status.idle":"2025-03-25T02:51:44.551380Z","shell.execute_reply.started":"2025-03-25T02:51:44.529963Z","shell.execute_reply":"2025-03-25T02:51:44.550690Z"},"jupyter":{"outputs_hidden":false}}
 # Checklist for GPU commits - LLM_SERVER_URL_MAIN, INTERNET, ACCELERATOR
 
-MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1"
-MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
-LLM_SERVER_URL_MAIN = (
-    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1"
-)
+MODEL_PATHS: list[str] = [
+    "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # code
+    "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # math
+    "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
+]
+MODEL_NAMES: list[str] = [
+    "casperhansen/deepseek-r1-distill-qwen-7b-awq",
+]
 
-# MODEL_PATH_MAIN = "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1"
-# MODEL_NAME_MAIN = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
-# LLM_SERVER_URL_MAIN = (
-#     "https://tonghuikang--example-vllm-openai-compatible-salt1337-32b-serve.modal.run/v1"
-# )
+LLM_SERVER_URLS: list[str] = [
+    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1",
+    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1",
+    "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
+]
 
-MODEL_PATH_SMALL = "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1"
-MODEL_NAME_SMALL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
-LLM_SERVER_URL_SMALL = "https://tonghuikang--example-vllm-openai-compatible-salt1337-1b5-serve.modal.run/v1"
+PORT_IDS: list[str] = [
+    8000,
+    8001,
+    8002,
+]
+
+LLM_SERVER_URLS: list[str] = [
+    f"http://0.0.0.0:{PORT_IDS[0]}/v1",
+    f"http://0.0.0.0:{PORT_IDS[1]}/v1",
+    f"http://0.0.0.0:{PORT_IDS[2]}/v1",
+]
+
+GPU_ASSIGNMENT: list[list] = [
+    [0, 1],
+    [2],
+    [3],
+]
+
+USE_LOCAL_LLM = "0.0.0.0" in LLM_SERVER_URLS[0]
 
 MAX_MODEL_LEN = 8192 * 2
-CODE_EXECUTION_COUNT = 16
-MATH_EXECUTION_COUNT = 0
-
-LLM_SERVER_URL_MAIN = "http://0.0.0.0:8000/v1"
-LLM_SERVER_URL_SMALL = "http://0.0.0.0:8001/v1"
+CODE_EXECUTION_COUNT = 12
+MATH_EXECUTION_COUNT = 16
 
 N_GPU = 4
-MAX_NUM_SEQS = CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
-USE_LOCAL_LLM = (LLM_SERVER_URL_MAIN == "http://0.0.0.0:8000/v1") and (
-    LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
-)
-
-assert (LLM_SERVER_URL_MAIN == "http://0.0.0.0:8000/v1") == (
-    LLM_SERVER_URL_SMALL == "http://0.0.0.0:8001/v1"
-)
 
 import pandas as pd
 
@@ -157,16 +165,44 @@ def start_model(
 
 
 if is_on_kaggle() and USE_LOCAL_LLM:
-    print("Starting main vLLM server")
+    print("Starting main vLLM servers")
+    # math
+    config_idx = 0
     process = start_model(
-        gpu_ids=[0, 1],
-        model_path=MODEL_PATH_MAIN,
-        model_name=MODEL_NAME_MAIN,
+        gpu_ids=GPU_ASSIGNMENT[config_idx],
+        model_path=MODEL_PATHS[config_idx],
+        model_name=MODEL_NAMES[config_idx],
         max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=MAX_NUM_SEQS,
+        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
         gpu_memory_utilization=0.90,
-        logfile_suffix="main",
-        port=8000,
+        logfile_suffix="math",
+        port=PORT_IDS[config_idx],
+    )
+
+    # code
+    config_idx = 1
+    process = start_model(
+        gpu_ids=GPU_ASSIGNMENT[config_idx],
+        model_path=MODEL_PATHS[config_idx],
+        model_name=MODEL_NAMES[config_idx],
+        max_model_len=MAX_MODEL_LEN,
+        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+        gpu_memory_utilization=0.90,
+        logfile_suffix="code",
+        port=PORT_IDS[config_idx],
+    )
+
+    # clf
+    config_idx = 2
+    process = start_model(
+        gpu_ids=GPU_ASSIGNMENT[config_idx],
+        model_path=MODEL_PATHS[config_idx],
+        model_name=MODEL_NAMES[config_idx],
+        max_model_len=MAX_MODEL_LEN,
+        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+        gpu_memory_utilization=0.90,
+        logfile_suffix="clf",
+        port=PORT_IDS[config_idx],
     )
 else:
     print("Using remote vLLM server")
@@ -180,15 +216,16 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from transformers import AutoTokenizer
 
 # Loading the tokenizer when vLLM server is starting
+# All models should be using the same tokenizer
 if is_on_kaggle():
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATH_MAIN,
+        MODEL_PATHS[0],
         trust_remote_code=True,
     )
     print("Tokenizer loaded")
 else:
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_NAME_MAIN,
+        MODEL_NAMES[0],
         trust_remote_code=True,
     )
 
@@ -203,8 +240,9 @@ def count_tokens(text: str) -> int:
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:19.924092Z","iopub.execute_input":"2025-03-25T02:52:19.924498Z","iopub.status.idle":"2025-03-25T02:52:27.404922Z","shell.execute_reply.started":"2025-03-25T02:52:19.924475Z","shell.execute_reply":"2025-03-25T02:52:27.404188Z"},"jupyter":{"outputs_hidden":false}}
 from openai import OpenAI, APIConnectionError
 
-client_main = OpenAI(base_url=LLM_SERVER_URL_MAIN, api_key="aimo")
-client_small = OpenAI(base_url=LLM_SERVER_URL_SMALL, api_key="aimo")
+client_math = OpenAI(base_url=LLM_SERVER_URLS[0], api_key="aimo")
+client_code = OpenAI(base_url=LLM_SERVER_URLS[1], api_key="aimo")
+client_clf = OpenAI(base_url=LLM_SERVER_URLS[2], api_key="aimo")
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:27.405618Z","iopub.execute_input":"2025-03-25T02:52:27.405833Z"},"jupyter":{"outputs_hidden":false}}
 import time
@@ -212,35 +250,14 @@ import time
 if is_on_kaggle():
     for _ in range(5 * 60):
         try:
-            print(client_main.models.list())
-            print("Starting small vLLM server")
-            process = start_model(
-                gpu_ids=[2, 3],
-                model_path=MODEL_PATH_SMALL,
-                model_name=MODEL_NAME_SMALL,
-                max_model_len=MAX_MODEL_LEN,
-                max_num_seqs=MAX_NUM_SEQS,
-                gpu_memory_utilization=0.90,
-                logfile_suffix="small",
-                port=8001,
-            )
+            print(client_math.models.list())
+            print(client_code.models.list())
+            print(client_clf.models.list())
             break
         except APIConnectionError as e:
             time.sleep(1)
-    else:
-        if not is_on_kaggle_submission():
-            raise
-
-if is_on_kaggle():
-    for _ in range(5 * 60):
-        try:
-            print(client_small.models.list())
-            break
-        except APIConnectionError as e:
-            time.sleep(1)
-    else:
-        if not is_on_kaggle_submission():
-            raise
+            if not is_on_kaggle_submission():
+                raise
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Helper functions
@@ -851,16 +868,16 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         last_attempted_prompt = prompt
 
         if not flag_for_training:
-            stream = client_main.completions.create(
-                model=MODEL_NAME_MAIN,
+            stream = client_code.completions.create(
+                model=MODEL_NAMES[1],
                 prompt=prompt,
                 max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
                 temperature=1.0,
                 stream=True,
             )
         else:
-            stream = client_small.completions.create(
-                model=MODEL_NAME_SMALL,
+            stream = client_clf.completions.create(
+                model=MODEL_NAMES[2],
                 prompt=prompt,
                 max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
                 temperature=1.0,
@@ -1089,8 +1106,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
         if question != current_question:
             break
 
-        stream = client_main.completions.create(
-            model=MODEL_NAME_MAIN,
+        stream = client_math.completions.create(
+            model=MODEL_NAMES[0],
             prompt=prompt,
             max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
             temperature=1.0,
