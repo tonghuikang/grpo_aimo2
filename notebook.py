@@ -159,7 +159,7 @@ def start_model(
 if is_on_kaggle() and USE_LOCAL_LLM:
     print("Starting main vLLM server")
     process = start_model(
-        gpu_ids=[0, 1, 2, 3],
+        gpu_ids=[0, 1],
         model_path=MODEL_PATH_MAIN,
         model_name=MODEL_NAME_MAIN,
         max_model_len=MAX_MODEL_LEN,
@@ -215,7 +215,7 @@ if is_on_kaggle():
             print(client_main.models.list())
             print("Starting small vLLM server")
             process = start_model(
-                gpu_ids=[0, 1, 2, 3],
+                gpu_ids=[2, 3],
                 model_path=MODEL_PATH_SMALL,
                 model_name=MODEL_NAME_SMALL,
                 max_model_len=MAX_MODEL_LEN,
@@ -836,12 +836,16 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     completion_block_count = 2
     seen_stdout = ""
     flag_for_training = False
+    request_counter = 0
+    token_counter = 0
 
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
         answer = extract_boxed_text(redact_sections(prompt))
         if answer and is_valid_answer_string(answer):
             break
         if question != current_question:
+            break
+        if request_counter > 20:
             break
 
         last_attempted_prompt = prompt
@@ -864,6 +868,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                 stop="```python",
             )
 
+        request_counter += 1
         generation_log = {
             "question": question,
             "method": "code",
@@ -874,6 +879,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         flag_for_training = False
 
         for chunk in stream:
+            token_counter += 1
             chunk_text = chunk.choices[0].text
 
             if question != current_question:
@@ -994,7 +1000,15 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             generation_log["code"] = code
             generation_log["reason"] = "stop_token"
 
+            if answer := extract_boxed_text(redact_sections(prompt)):
+                if not (answer and is_valid_answer_string(answer)):
+                    generation_log["injected"] = code_output_chunk
+                    flag_for_training = True
+                    add_text_chunk(code_output_chunk, reset_buffer=True)
+
         generation_log["timestamp"] = time.time() - question_start_time
+        generation_log["request_counter"] = request_counter
+        generation_log["token_counter"] = token_counter
         generation_logs_local.append(generation_log)
         stream.close()
 
@@ -1010,6 +1024,8 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             "prompt": prompt,
             "elapsed": last_attempted_prompt,
             "buffer": prompt[len(last_attempted_prompt) :],
+            "request_counter": request_counter,
+            "token_counter": token_counter,
             "flag_for_training": False,
             "reason": "final",
         }
