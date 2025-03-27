@@ -103,7 +103,7 @@ if is_on_modal():
     MODEL_NAMES[2] = MODEL_NAMES[1]
 
     MATH_EXECUTION_COUNT = 0
-    CODE_EXECUTION_COUNT = 16
+    CODE_EXECUTION_COUNT = 72
 
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
@@ -200,6 +200,12 @@ def start_model(
     --max-seq-len-to-capture {max_model_len} \
     --gpu-memory-utilization {gpu_memory_utilization} \
     """
+
+    if is_on_kaggle_submission() or is_on_modal():
+        command += " --disable-log-requests"
+    
+    if is_on_kaggle_submission():
+        command += " --disable-log-stats"
 
     if is_on_kaggle():
         stdout_fd = open(f"vllm_serve-{logfile_suffix}.log", "w")
@@ -524,7 +530,6 @@ import ast
 import builtins
 
 builtin_names = set(dir(builtins))
-print(builtin_names)
 
 
 def find_potential_name_errors(tree: ast.Module) -> list[str]:
@@ -738,9 +743,11 @@ def transform_code(code: str) -> str:
 # ----- Code Execution Function -----
 
 
+import os
 import threading
 
 excecute_locks = [threading.Lock() for _ in range(max(1, os.cpu_count() // 2))]
+print("cpu_count",  os.cpu_count())
 
 
 def execute_code(
@@ -1294,7 +1301,7 @@ def has_early_answer(answers: list[str]) -> bool:
     total_attempts = sum(counter.values())
 
     if is_on_modal():
-        if highest_frequency >= max(1, CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT - 1):
+        if highest_frequency >= max(1, 2 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 3):
             return True
         return False
 

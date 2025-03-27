@@ -36,6 +36,7 @@ volume = modal.Volume.from_name("aimo2", create_if_missing=False)  # for the mod
 @app.function(
     image=image,
     gpu="H100",
+    cpu=32,
     timeout=2 * 60 * 60,
     volumes={MODELS_DIR: volume},
 )
