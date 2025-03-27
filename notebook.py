@@ -174,6 +174,8 @@ if is_on_kaggle():
     REFERENCE_CSV = (
         "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
     )
+elif is_on_modal():
+    REFERENCE_CSV = "./AIME_Dataset_1983_2024.csv"
 else:
     REFERENCE_CSV = "./reference.csv"
 
@@ -181,6 +183,9 @@ else:
 import pandas as pd
 
 df_reference = pd.read_csv(REFERENCE_CSV)
+if is_on_modal():
+    df_reference.sample(min(len(df_reference), 100))
+
 question_to_answer_map: dict[str, str] = dict(
     zip(df_reference["problem"], df_reference["answer"])
 )
@@ -448,8 +453,8 @@ def pow(base, exp, mod=None):
         return builtins_pow(sympify(base), sympify(exp), sympify(mod))        
 
 def truncate_line(line: str) -> str:
-    if len(line) >= 2500:
-        return line[:1000] + "[truncated]" + line[-1000:]
+    if len(line) >= 1000:
+        return line[:100] + "[truncated]" + line[-100:]
     return line
 
 def print2(string: str):
@@ -841,8 +846,8 @@ def execute_code(
 
 
 def truncate_line(line: str) -> str:
-    if len(line) >= 2500:
-        return line[:1000] + "[truncated]" + line[-1000:]
+    if len(line) >= 1000:
+        return line[:100] + "[truncated]" + line[-100:]
     return line
 
 
@@ -1396,6 +1401,7 @@ results_lock = threading.Lock()  # Thread lock for protecting shared results
 
 
 def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
+    print(question)
     global math_results, code_results, generation_logs, current_question
     import time
 
@@ -1509,7 +1515,6 @@ def predict(
     print(id_)
 
     question: str = question_object.item(0)
-    print(question)
 
     answer: int = predict_for_question(question)
     print("------\n\n\n")
@@ -1547,7 +1552,7 @@ if is_on_kaggle_interactive():
 if is_on_modal():
     for question in question_to_answer_map:
         predict_for_question(question)
-        break
+        # break
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Prediction

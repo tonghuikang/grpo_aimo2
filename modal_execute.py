@@ -26,8 +26,9 @@ image = (
         "openai",
         "triton",
     )
-    .add_local_file("./notebook.py", "/root/notebook.py")
     .add_local_file("./reference.csv", "/root/reference.csv")
+    .add_local_file("./AIME_Dataset_1983_2024.csv", "/root/AIME_Dataset_1983_2024.csv")
+    .add_local_file("./notebook.py", "/root/notebook.py")
 )
 
 
@@ -42,7 +43,7 @@ volume = modal.Volume.from_name("aimo2", create_if_missing=False)  # for the mod
     image=image,
     gpu="H100",
     cpu=32,
-    timeout=2 * 60 * 60,
+    timeout=24 * 60 * 60,
     volumes={MODELS_DIR: volume},
 )
 def execute():
