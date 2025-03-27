@@ -2,10 +2,15 @@ import modal
 import modal.gpu
 
 
-# cuda_version = "11.8.0"  # should be no greater than host CUDA version
-# flavor = "devel"  #  includes full CUDA toolkit
-# operating_sys = "ubuntu22.04"
-# tag = f"{cuda_version}-{flavor}-{operating_sys}"
+"""
+Execute
+
+modal run modal_execute.py
+
+Download artifacts
+
+for file in $(modal nfs ls saved_files); do echo "Checking: $file"; if [ ! -f "generation/$file" ]; then echo "Downloading: $file"; modal nfs get saved_files $file generation/$file; else echo "Skipping (already exists): $file"; fi; done
+"""
 
 nfs = modal.NetworkFileSystem.from_name("saved_files", create_if_missing=True)
 

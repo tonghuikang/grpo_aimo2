@@ -87,24 +87,44 @@ def is_on_modal() -> bool:
     return bool(os.getenv("MODAL_ENVIRONMENT"))
 
 
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
+
+
 if is_on_modal():
-    MODELS_DIR = "/aimo2"
-    MODEL_PATHS: list[str] = [
-        os.path.join(MODELS_DIR, model_name) for model_name in MODEL_NAMES
-    ]
+    # if we want to use a different model to generate classification input
+    MODEL_NAMES[1] = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
+    CODE_EXECUTION_COUNT = 72
+
+    # MODEL_NAMES[1] = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
+    # CODE_EXECUTION_COUNT = 12
+
+    # MODEL_NAMES[1] = "Qwen/QwQ-32B-AWQ"  # note: for generating data only
+    # CODE_EXECUTION_COUNT = 12
+    # MAX_MODEL_LEN = 8192 * 2
+
+if is_on_modal():
+    # Use the same model for inference and classification
+    LLM_SERVER_URLS[2] = LLM_SERVER_URLS[1]  # use the same model
+    MODEL_NAMES[2] = MODEL_NAMES[1]
+
     GPU_ASSIGNMENT: list[list] = [
         [],
         [0],
         [],
     ]
 
-    #
-    LLM_SERVER_URLS[2] = LLM_SERVER_URLS[1]  # use the same model
-    MODEL_NAMES[2] = MODEL_NAMES[1]
 
+if is_on_modal():
+    # not computing math trajectories
     MATH_EXECUTION_COUNT = 0
-    CODE_EXECUTION_COUNT = 72
 
+
+if is_on_modal():
+    # Override MODEL_PATHS
+    MODELS_DIR = "/aimo2"
+    MODEL_PATHS: list[str] = [
+        os.path.join(MODELS_DIR, model_name) for model_name in MODEL_NAMES
+    ]
 
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
 
@@ -203,7 +223,7 @@ def start_model(
 
     if is_on_kaggle_submission() or is_on_modal():
         command += " --disable-log-requests"
-    
+
     if is_on_kaggle_submission():
         command += " --disable-log-stats"
 
@@ -288,13 +308,13 @@ from transformers import AutoTokenizer
 # All models should be using the same tokenizer
 if is_on_kaggle() or is_on_modal():
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATHS[0],
+        MODEL_PATHS[1],
         trust_remote_code=True,
     )
     print("Tokenizer loaded")
 else:
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_NAMES[0],
+        MODEL_NAMES[1],
         trust_remote_code=True,
     )
 
@@ -746,8 +766,9 @@ def transform_code(code: str) -> str:
 import os
 import threading
 
-excecute_locks = [threading.Lock() for _ in range(max(1, os.cpu_count() // 2))]
-print("cpu_count",  os.cpu_count())
+# if we don't lock, we are more likely to see code timeouts for code that should not timeout
+excecute_locks = [threading.Lock() for _ in range(max(1, 2 * os.cpu_count() // 3))]
+print("cpu_count", os.cpu_count(), len(excecute_locks))
 
 
 def execute_code(
@@ -962,7 +983,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                 max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
                 temperature=1.0,
                 stream=True,
-                stop="```python",
+                stop="```python",  # returned text will not contain the stop sequence
             )
 
         request_counter += 1
@@ -1108,10 +1129,18 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             generation_log["code"] = code
             generation_log["reason"] = "stop_token"
 
-            if not buffer.strip().endswith("```python"):
-                reset_chunk = "<｜end▁of▁sentence｜>" + code_initial_prompt
-                generation_log["injected"] = reset_chunk
-                add_text_chunk(reset_chunk, reset_buffer=True)
+            if not extract_boxed_text(redact_sections(prompt)):
+                if generation_log["flag_for_training"]:
+                    # if flag_for_training, if not submitting answer, assume all stop tokens is ```python
+                    reset_chunk = "\n```python\n"
+                    generation_log["injected"] = reset_chunk
+                    add_text_chunk(reset_chunk, reset_buffer=False)
+                else:
+                    reset_chunk = "<｜end▁of▁sentence｜>" + math_initial_prompt.format(
+                        question=question
+                    )
+                    generation_log["injected"] = reset_chunk
+                    add_text_chunk(reset_chunk, reset_buffer=True)
 
         generation_log["timestamp"] = time.time() - question_start_time
         generation_log["request_counter"] = request_counter
@@ -1138,7 +1167,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         }
     )
     for generation_log in generation_logs_local:
-        generation_log["eventual_answer"] = answer
+        generation_log["eventual_answer"] = answer if answer is not None else -1
     for generation_log in generation_logs_local:
         generation_log["correct_answer"] = question_to_answer_map.get(question, "")
 
@@ -1301,7 +1330,9 @@ def has_early_answer(answers: list[str]) -> bool:
     total_attempts = sum(counter.values())
 
     if is_on_modal():
-        if highest_frequency >= max(1, 2 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 3):
+        if total_attempts >= max(
+            1, 2 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 3
+        ):
             return True
         return False
 
