@@ -184,7 +184,7 @@ import pandas as pd
 
 df_reference = pd.read_csv(REFERENCE_CSV)
 if is_on_modal():
-    df_reference.sample(min(len(df_reference), 100))
+    df_reference.sample(min(len(df_reference), 100), random_state=42)
 
 question_to_answer_map: dict[str, str] = dict(
     zip(df_reference["problem"], df_reference["answer"])
@@ -454,7 +454,7 @@ def pow(base, exp, mod=None):
 
 def truncate_line(line: str) -> str:
     if len(line) >= 1000:
-        return line[:100] + "[truncated]" + line[-100:]
+        return line[:100] + f"[truncated {len(line) - 100 - 100} characters]" + line[-100:]
     return line
 
 def print2(string: str):
@@ -462,7 +462,7 @@ def print2(string: str):
     print2_count -= 1
     if print2_count > 0:
         print(string)
-        
+
 import math
 import numpy as np
 import sympy as sp
@@ -847,7 +847,9 @@ def execute_code(
 
 def truncate_line(line: str) -> str:
     if len(line) >= 1000:
-        return line[:100] + "[truncated]" + line[-100:]
+        return (
+            line[:100] + f"[truncated {len(line) - 100 - 100} characters]" + line[-100:]
+        )
     return line
 
 
@@ -858,8 +860,12 @@ def truncate_paragraph(output):
         line = truncate_line(line)
         lines_new.append(line)
     output_new = "\n".join(lines_new)
-    if len(output_new) >= 10_500:
-        output_new = output_new[:5000] + "[truncated]" + output_new[-5000:]
+    if len(output_new) >= 7_500:
+        output_new = (
+            output_new[:2000]
+            + f"[truncated {len(output_new) - 2000 - 2000} characters]"
+            + output_new[-2000:]
+        )
     return output_new
 
 
