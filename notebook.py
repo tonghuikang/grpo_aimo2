@@ -34,6 +34,7 @@ cutoff_times.pop()
 # Checklist for GPU commits - LLM_SERVER_URL_MAIN, INTERNET, ACCELERATOR
 
 MODEL_PATHS: list[str] = [
+    # will be overridden in Modal environment
     "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # code
     "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # math
     "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
@@ -58,12 +59,15 @@ PORT_IDS: list[int] = [
 ]
 
 LLM_SERVER_URLS: list[str] = [
-    f"http://0.0.0.0:{PORT_IDS[0]}/v1",
-    f"http://0.0.0.0:{PORT_IDS[1]}/v1",
-    f"http://0.0.0.0:{PORT_IDS[2]}/v1",
+    # comment out this whole block if using remote LLM
+    # may be overridden in Modal environment
+    f"http://0.0.0.0:{PORT_IDS[0]}/v1",  # math
+    f"http://0.0.0.0:{PORT_IDS[1]}/v1",  # code
+    f"http://0.0.0.0:{PORT_IDS[2]}/v1",  # clf
 ]
 
 GPU_ASSIGNMENT: list[list] = [
+    # will be overridden in Modal environment
     [0, 1],
     [2],
     [3],
@@ -72,8 +76,43 @@ GPU_ASSIGNMENT: list[list] = [
 USE_LOCAL_LLM = "0.0.0.0" in LLM_SERVER_URLS[0]
 
 MAX_MODEL_LEN = 8192 * 2
-CODE_EXECUTION_COUNT = 12
 MATH_EXECUTION_COUNT = 16
+CODE_EXECUTION_COUNT = 12
+
+
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
+
+
+def is_on_modal() -> bool:
+    return bool(os.getenv("MODAL_ENVIRONMENT"))
+
+
+if is_on_modal():
+    MODELS_DIR = "/aimo2"
+    MODEL_PATHS: list[str] = [
+        os.path.join(MODELS_DIR, model_name) for model_name in MODEL_NAMES
+    ]
+    GPU_ASSIGNMENT: list[list] = [
+        [],
+        [0],
+        [],
+    ]
+
+    #
+    LLM_SERVER_URLS[2] = LLM_SERVER_URLS[1]  # use the same model
+    MODEL_NAMES[2] = MODEL_NAMES[1]
+
+    MATH_EXECUTION_COUNT = 0
+    CODE_EXECUTION_COUNT = 16
+
+
+# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
+
+if len(GPU_ASSIGNMENT[0]) == 0:
+    assert MATH_EXECUTION_COUNT == 0
+
+if len(GPU_ASSIGNMENT[1]) == 0:
+    assert CODE_EXECUTION_COUNT == 0
 
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
@@ -111,14 +150,15 @@ def is_on_kaggle_submission() -> bool:
     return bool(os.getenv("KAGGLE_IS_COMPETITION_RERUN"))
 
 
-import pandas as pd
-
 if is_on_kaggle():
     REFERENCE_CSV = (
         "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
     )
 else:
     REFERENCE_CSV = "./reference.csv"
+
+
+import pandas as pd
 
 df_reference = pd.read_csv(REFERENCE_CSV)
 question_to_answer_map: dict[str, str] = dict(
@@ -157,60 +197,76 @@ def start_model(
     --max_num_seqs {max_num_seqs} \
     --tensor-parallel-size {len(gpu_ids)} \
     --max-model-len {max_model_len} \
+    --max-seq-len-to-capture {max_model_len} \
     --gpu-memory-utilization {gpu_memory_utilization} \
     """
 
-    stdout_fd = open(f"vllm_serve-{logfile_suffix}.log", "w")
-    stderr_fd = open(f"vllm_serve-{logfile_suffix}.err", "w")
+    if is_on_kaggle():
+        stdout_fd = open(f"vllm_serve-{logfile_suffix}.log", "w")
+        stderr_fd = open(f"vllm_serve-{logfile_suffix}.err", "w")
 
-    # Start the process without blocking
-    process = subprocess.Popen(
-        ["bash", "-c", command], stdout=stdout_fd, stderr=stderr_fd, text=True
-    )
+        # Start the process without blocking, direct outputs to file
+        process = subprocess.Popen(
+            ["bash", "-c", command],
+            stdout=stdout_fd,
+            stderr=stderr_fd,
+            text=True,
+        )
+    elif is_on_modal():
+        # Start the process without blocking
+        process = subprocess.Popen(
+            ["bash", "-c", command],
+            text=True,
+        )
+    else:
+        raise ValueError
 
     return process
 
 
-if is_on_kaggle() and USE_LOCAL_LLM:
+if (is_on_kaggle() or is_on_modal()) and USE_LOCAL_LLM:
     print("Starting main vLLM servers")
     # math
     config_idx = 0
-    process = start_model(
-        gpu_ids=GPU_ASSIGNMENT[config_idx],
-        model_path=MODEL_PATHS[config_idx],
-        model_name=MODEL_NAMES[config_idx],
-        max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=max(1, MATH_EXECUTION_COUNT),
-        gpu_memory_utilization=0.90,
-        logfile_suffix="math",
-        port=PORT_IDS[config_idx],
-    )
+    if len(GPU_ASSIGNMENT[config_idx]) > 0:
+        process = start_model(
+            gpu_ids=GPU_ASSIGNMENT[config_idx],
+            model_path=MODEL_PATHS[config_idx],
+            model_name=MODEL_NAMES[config_idx],
+            max_model_len=MAX_MODEL_LEN,
+            max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+            gpu_memory_utilization=0.90,
+            logfile_suffix="math",
+            port=PORT_IDS[config_idx],
+        )
 
     # code
     config_idx = 1
-    process = start_model(
-        gpu_ids=GPU_ASSIGNMENT[config_idx],
-        model_path=MODEL_PATHS[config_idx],
-        model_name=MODEL_NAMES[config_idx],
-        max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=max(1, CODE_EXECUTION_COUNT),
-        gpu_memory_utilization=0.90,
-        logfile_suffix="code",
-        port=PORT_IDS[config_idx],
-    )
+    if len(GPU_ASSIGNMENT[config_idx]) > 0:
+        process = start_model(
+            gpu_ids=GPU_ASSIGNMENT[config_idx],
+            model_path=MODEL_PATHS[config_idx],
+            model_name=MODEL_NAMES[config_idx],
+            max_model_len=MAX_MODEL_LEN,
+            max_num_seqs=max(1, CODE_EXECUTION_COUNT),
+            gpu_memory_utilization=0.90,
+            logfile_suffix="code",
+            port=PORT_IDS[config_idx],
+        )
 
     # clf
     config_idx = 2
-    process = start_model(
-        gpu_ids=GPU_ASSIGNMENT[config_idx],
-        model_path=MODEL_PATHS[config_idx],
-        model_name=MODEL_NAMES[config_idx],
-        max_model_len=MAX_MODEL_LEN,
-        max_num_seqs=max(1, CODE_EXECUTION_COUNT),
-        gpu_memory_utilization=0.90,
-        logfile_suffix="clf",
-        port=PORT_IDS[config_idx],
-    )
+    if len(GPU_ASSIGNMENT[config_idx]) > 0:
+        process = start_model(
+            gpu_ids=GPU_ASSIGNMENT[config_idx],
+            model_path=MODEL_PATHS[config_idx],
+            model_name=MODEL_NAMES[config_idx],
+            max_model_len=MAX_MODEL_LEN,
+            max_num_seqs=max(1, CODE_EXECUTION_COUNT),
+            gpu_memory_utilization=0.90,
+            logfile_suffix="clf",
+            port=PORT_IDS[config_idx],
+        )
 else:
     print("Using remote vLLM server")
 
@@ -224,7 +280,7 @@ from transformers import AutoTokenizer
 
 # Loading the tokenizer when vLLM server is starting
 # All models should be using the same tokenizer
-if is_on_kaggle():
+if is_on_kaggle() or is_on_modal():
     tokenizer = AutoTokenizer.from_pretrained(
         MODEL_PATHS[0],
         trust_remote_code=True,
@@ -254,14 +310,17 @@ client_clf = OpenAI(base_url=LLM_SERVER_URLS[2], api_key="aimo")
 # %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:27.405618Z","iopub.execute_input":"2025-03-25T02:52:27.405833Z"},"jupyter":{"outputs_hidden":false}}
 import time
 
-if is_on_kaggle():
+if is_on_kaggle() or is_on_modal():
     num_retries_to_load = 10 * 60
     while num_retries_to_load > 0:
         num_retries_to_load -= 1
         try:
-            print(client_math.models.list())
-            print(client_code.models.list())
-            print(client_clf.models.list())
+            if len(GPU_ASSIGNMENT[0]) > 0:
+                print(client_math.models.list())
+            if len(GPU_ASSIGNMENT[1]) > 0:
+                print(client_code.models.list())
+            if len(GPU_ASSIGNMENT[2]) > 0:
+                print(client_clf.models.list())
             break
         except APIConnectionError as e:
             time.sleep(1)
@@ -1234,6 +1293,11 @@ def has_early_answer(answers: list[str]) -> bool:
     highest_frequency = max(counter.values())
     total_attempts = sum(counter.values())
 
+    if is_on_modal():
+        if highest_frequency >= max(1, CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT - 1):
+            return True
+        return False
+
     if highest_frequency >= 2 and total_attempts <= 2:
         return True
     if highest_frequency >= 3 and total_attempts <= 4:
@@ -1306,7 +1370,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
 
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
-    if selected_questions_only and not is_on_kaggle_submission():
+    if selected_questions_only and is_on_kaggle() and not is_on_kaggle_submission():
         if "Fred" not in question and "Triangle" not in question:
             return 210
         # if "Triangle" not in question:
@@ -1440,6 +1504,12 @@ if is_on_kaggle_interactive():
 # %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:57.643794Z","iopub.status.idle":"2025-03-19T08:43:57.644071Z","shell.execute_reply":"2025-03-19T08:43:57.643952Z"}}
 if is_on_kaggle_interactive():
     predict_for_question(question_sample)
+
+# %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:57.643794Z","iopub.status.idle":"2025-03-19T08:43:57.644071Z","shell.execute_reply":"2025-03-19T08:43:57.643952Z"}}
+if is_on_modal():
+    for question in question_to_answer_map:
+        predict_for_question(question)
+        break
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Prediction
