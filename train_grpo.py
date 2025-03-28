@@ -85,7 +85,7 @@ if __name__ == "__main__":
             return -10
 
         # attempted answer and is correct
-        return 10 + length_preference_function(completion_length)
+        return 9.5 + length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [
@@ -97,7 +97,8 @@ if __name__ == "__main__":
     from trl import GRPOConfig, GRPOTrainer
 
     learning_rate = 3e-5
-    num_iterations = 7
+    num_iterations = 2
+    gradient_accumulation_steps = 8
 
     training_args = GRPOConfig(
         # length limits (which needs to be changed for these to be useful)
@@ -112,14 +113,14 @@ if __name__ == "__main__":
         per_device_train_batch_size=NUM_GENERATIONS // TRAIN_NUM_GPUS,
         # num_devices * this_number should be num_generations
         gradient_accumulation_steps=num_iterations,
-        num_train_epochs=4.0,
+        num_train_epochs=1.0,
         # output_dir="DeepSeek-R1-Distill-Qwen-1.5B-GRPO",
         num_iterations=num_iterations,
-        output_dir=f"DeepSeek-R1-Distill-Qwen-1.5B-GRPO-{num_iterations}-{learning_rate:.0e}",
+        output_dir=f"DeepSeek-R1-Distill-Qwen-1.5B-GRPO-{num_iterations}-{gradient_accumulation_steps}-{learning_rate:.0e}",
         logging_steps=1,
         lr_scheduler_type="cosine",
         warmup_steps=7,
-        learning_rate=3e-5,
+        learning_rate=learning_rate,
         epsilon_high=0.28,
         beta=0.1,
         scale_rewards=False,
