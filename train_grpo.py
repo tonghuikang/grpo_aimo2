@@ -79,13 +79,13 @@ if __name__ == "__main__":
         if not answer_attempt:
             # penalize long sequences, likely attempting to solve on its own
             # not sure if it affects the math sequences
-            return -0.5 + length_preference_function(completion_length)
+            return 0  # -0.5 + length_preference_function(completion_length)
 
         if not answer_correct:
             return -10
 
         # attempted answer and is correct
-        return 9.5 + length_preference_function(completion_length)
+        return 10  # 9.5 + length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [
