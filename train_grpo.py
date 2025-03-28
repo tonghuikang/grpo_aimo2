@@ -47,6 +47,7 @@ if __name__ == "__main__":
     import datasets
 
     dataset = datasets.Dataset.from_csv("training_dataset.csv")
+    evaluation_dataset = datasets.Dataset.from_csv("evaluation_dataset.csv")
     # dataset = datasets.load_dataset("trl-lib/tldr", split="train")
     # dataset = dataset.select(range(1600))
 
@@ -137,6 +138,7 @@ if __name__ == "__main__":
         reward_funcs=reward_func,
         args=training_args,
         train_dataset=dataset,
+        eval_dataset=evaluation_dataset,
     )
 
     print("\ntraining start")
