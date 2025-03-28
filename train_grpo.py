@@ -74,7 +74,7 @@ if __name__ == "__main__":
         completion_length = len(tokenizer.encode(completion[:relevant_index]))
 
         if not answer_attempt and not contains_python_opening:
-            return -0.75
+            return -5
 
         if not answer_attempt:
             # penalize long sequences, likely attempting to solve on its own
@@ -82,10 +82,10 @@ if __name__ == "__main__":
             return -0.5 + length_preference_function(completion_length)
 
         if not answer_correct:
-            return -1
+            return -10
 
         # attempted answer and is correct
-        return 0.5 + 2 * length_preference_function(completion_length)
+        return 10 + length_preference_function(completion_length)
 
     def reward_func(prompts, completions, correct_answer, **kwargs):
         return [

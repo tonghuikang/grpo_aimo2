@@ -184,7 +184,15 @@ import pandas as pd
 
 df_reference = pd.read_csv(REFERENCE_CSV)
 if is_on_modal():
-    df_reference.sample(min(len(df_reference), 100), random_state=42)
+    df_reference.sample(min(len(df_reference), 1000), random_state=43)
+
+    start_time = time.time()
+    final_cutoff_time = start_time + len(df_reference) * 3 * 60
+    cutoff_times = [
+        int(x) for x in np.linspace(final_cutoff_time, start_time + 4 * 60, len(df_reference) + 1)
+    ]  # 4 minutes loading time at the start
+    cutoff_times.pop()
+
 
 question_to_answer_map: dict[str, str] = dict(
     zip(df_reference["problem"], df_reference["answer"])
@@ -1342,7 +1350,7 @@ def has_early_answer(answers: list[str]) -> bool:
 
     if is_on_modal():
         if total_attempts >= max(
-            1, 2 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 3
+            1, 1 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 2
         ):
             return True
         return False

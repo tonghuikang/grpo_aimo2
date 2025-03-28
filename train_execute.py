@@ -118,6 +118,30 @@ def train_grpo():
     with open(file_path, "w") as file:
         file.write(modified_content)
 
+    file_path = "/usr/local/lib/python3.11/site-packages/transformers/trainer.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = 'DataLoader(train_dataset,'
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f'{old_string} shuffle=False,',
+    )
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
+    file_path = "/usr/local/lib/python3.11/site-packages/trl/trainer/grpo_trainer.py"
+    with open(file_path, "r") as file:
+        content = file.read()
+    old_string = 'indexes = torch.randperm(self.num_samples, generator=self.generator).tolist()'
+    print("index", content.index(old_string))
+    modified_content = content.replace(
+        old_string,
+        f'indexes = torch.arange(self.num_samples).tolist()',
+    )
+    with open(file_path, "w") as file:
+        file.write(modified_content)
+
     # Start vllm server as a background process
     import os
     import subprocess
