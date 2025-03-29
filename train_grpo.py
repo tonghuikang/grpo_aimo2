@@ -5,6 +5,7 @@ from train_config import (
     TRAIN_CUDA_VISIBLE_DEVICES,
     NUM_GENERATIONS,
     CAPACITY_PER_GPU,
+    TRAIN_NUM_GPUS,
     MAX_PROMPT_LENGTH,
     MAX_COMPLETION_LENGTH,
 )
@@ -15,10 +16,15 @@ if __name__ == "__main__":
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    # Start vllm server as a background process
-    import os
+    import torch
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = TRAIN_CUDA_VISIBLE_DEVICES
+    if torch.cuda.is_available():
+        print(f"CUDA Available: {torch.cuda.is_available()}")
+        print(f"Device Count: {torch.cuda.device_count()}")
+        print(f"Current Device: {torch.cuda.current_device()}")
+        print(f"Device Name: {torch.cuda.get_device_name(torch.cuda.current_device())}")
+    else:
+        print("CUDA not available")
 
     # Load tokenizer for scoring use
     from transformers import AutoTokenizer
@@ -61,34 +67,32 @@ if __name__ == "__main__":
         y = math.e * x * math.exp(-x)
         return (min(y, ceiling)) ** (scaling) / ceiling
 
-    def length_thinking_func(prompts, completions, correct_answer, **kwargs):
+    def length_func(prompts, completions, correct_answer, **kwargs):
         # the thinking part should be around 256 tokens
 
         def func(completion):
             if "</think>" not in completion:
                 return 0
-            relevant_index = completion.index("</think>")
-            completion_length = len(tokenizer.encode(completion[:relevant_index]))
-            return length_preference_function(completion_length, scaling=1)
+            tokens = tokenizer.encode(completion)
+            thinking_length = tokens.index(151649)
+            full_length = len(tokens)
+            return length_preference_function(
+                thinking_length, preferred_length=256 - 10, scaling=1
+            ) + length_preference_function(
+                full_length, preferred_length=256 - 10, scaling=1
+            )
 
         return [func(completion) for completion in completions]
 
-    def length_total_func(prompts, completions, correct_answer, **kwargs):
-        # the total output should be around 256 tokens
-
-        def func(completion):
-            completion_length = len(tokenizer.encode(completion))
-            return length_preference_function(completion_length, scaling=1)
-
-        return [func(completion) for completion in completions]
-
-    def format_thinking_func(prompts, completions, correct_answer, **kwargs):
+    def format_func(prompts, completions, correct_answer, **kwargs):
         # each line of thinking text should be 100 characters
 
         def func(completion):
             if "</think>" not in completion:
                 return 0
             if "oxed{" not in completion and "```python" not in completion:
+                return 0
+            if "oxed{" in completion and "```python" in completion:
                 return 0
             completion = completion[: completion.index("</think>")].strip()
 
@@ -102,10 +106,11 @@ if __name__ == "__main__":
                 )
                 numerator += score * length
                 denominator += length
+                numerator += 100 * score
+                denominator += 100
             return numerator / denominator
 
         return [func(completion) for completion in completions]
-
 
     import re
 
@@ -131,11 +136,11 @@ if __name__ == "__main__":
         return 1
 
     correctness_func_counter = [0]
-    TOTAL_CALLS_ESTIMATED = (
-        len(dataset) // 2 * NUM_GENERATIONS
+    TOTAL_CALLS_ESTIMATED = len(dataset) // (
+        CAPACITY_PER_GPU * TRAIN_NUM_GPUS // NUM_GENERATIONS
     )  # evaluation counts not considered
-    CALLS_UNTIL_CONSIDER_CORRECTNESS = TOTAL_CALLS_ESTIMATED // 2
-    CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY = CALLS_UNTIL_CONSIDER_CORRECTNESS // 2
+    CALLS_UNTIL_CONSIDER_CORRECTNESS = TOTAL_CALLS_ESTIMATED // 4
+    CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY = TOTAL_CALLS_ESTIMATED
 
     def correctness_func(prompts, completions, correct_answer, **kwargs):
         # the answer should be correct
@@ -206,10 +211,10 @@ if __name__ == "__main__":
     trainer = GRPOTrainer(
         model=model,
         reward_funcs=[
-            format_thinking_func,
-            length_thinking_func,
-            length_total_func,
+            format_func,
+            length_func,
             correctness_func,
+            # counter_func,
             correctness_ref,
         ],
         args=training_args,

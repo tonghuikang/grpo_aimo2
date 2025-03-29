@@ -46,6 +46,7 @@ app = modal.App("grpo-training", image=image)
     image=image,
     gpu=GPU,
     timeout=2 * 60 * 60,
+    max_containers=1,
 )
 def train_grpo():
     import os

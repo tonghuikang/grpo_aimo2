@@ -1199,6 +1199,8 @@ dependencies = [
     { name = "ipython" },
     { name = "liger-kernel" },
     { name = "modal" },
+    { name = "triton", version = "3.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'aarch64' or sys_platform != 'linux'" },
+    { name = "triton", version = "3.2.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'aarch64' and sys_platform == 'linux'" },
     { name = "trl", extra = ["vllm"] },
     { name = "wandb" },
 ]
@@ -1209,6 +1211,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=8.12.3" },
     { name = "liger-kernel" },
     { name = "modal", specifier = ">=0.73.116" },
+    { name = "triton" },
     { name = "trl", extras = ["vllm"], specifier = "==0.16.0" },
     { name = "wandb", specifier = ">=0.19.8" },
 ]
