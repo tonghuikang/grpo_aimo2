@@ -8,6 +8,8 @@ from train_config import (
     VLLM_CUDA_VISIBLE_DEVICES,
     TRAIN_CUDA_VISIBLE_DEVICES,
     TRAIN_NUM_PROCESSES,
+    MAX_PROMPT_LENGTH,
+    MAX_COMPLETION_LENGTH,
     GPU,
 )
 
@@ -160,7 +162,7 @@ def train_grpo():
             "--model",
             REFERENCE_MODEL_NAME,
             "--max_model_len",
-            "4096",
+            f"{MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH}",
         ],
         # stdout=subprocess.DEVNULL,  # suppress stdout
     )
