@@ -5,7 +5,7 @@ import modal.gpu
 """
 Execute
 
-modal run modal_execute.py
+modal run modal_notebook.py
 
 Download artifacts
 
