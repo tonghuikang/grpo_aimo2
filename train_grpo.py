@@ -57,6 +57,33 @@ if __name__ == "__main__":
     # dataset = datasets.load_dataset("trl-lib/tldr", split="train")
     # dataset = dataset.select(range(1600))
 
+    # functions for reward weights
+    correctness_func_counter = [0]
+    TOTAL_CALLS_ESTIMATED = len(dataset) // (
+        CAPACITY_PER_GPU * TRAIN_NUM_GPUS // NUM_GENERATIONS
+    )  # evaluation counts not considered
+    CALLS_UNTIL_CONSIDER_CORRECTNESS = TOTAL_CALLS_ESTIMATED // 4
+    CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY = TOTAL_CALLS_ESTIMATED
+    MAX_CORRECTNESS_WEIGHT = 0.75
+
+    def get_correctness_weight(increment=True):
+        if increment:
+            correctness_func_counter[0] += 1
+        # correctness weight is zero at the start
+        factor = (correctness_func_counter[0] - CALLS_UNTIL_CONSIDER_CORRECTNESS) / (
+            CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY - CALLS_UNTIL_CONSIDER_CORRECTNESS
+        )
+        factor = min(1, factor)
+        return MAX_CORRECTNESS_WEIGHT * factor
+
+    def get_length_weight():
+        return (1 - get_correctness_weight(increment=False)) // 2
+
+    def get_formatting_weight():
+        return (1 - get_correctness_weight(increment=False)) // 2
+
+    # helper functions for reward
+
     import math
 
     def length_preference_function(
@@ -67,33 +94,42 @@ if __name__ == "__main__":
         y = math.e * x * math.exp(-x)
         return (min(y, ceiling)) ** (scaling) / ceiling
 
+    def is_formatting_valid(completion):
+        if "</think>" not in completion:
+            return False
+        if "oxed{" not in completion and "```python" not in completion:
+            return False
+        if "oxed{" in completion and "```python" in completion:
+            return False
+        return True
+
     def length_func(prompts, completions, correct_answer, **kwargs):
         # the thinking part should be around 256 tokens
+        # the full completion should be around 256 tokens
+        # -> [0, 1]
 
         def func(completion):
-            if "</think>" not in completion:
+            if not is_formatting_valid(completion):
                 return 0
             tokens = tokenizer.encode(completion)
-            thinking_length = tokens.index(151649)
+            thinking_length = tokens.index(151649)  # </think>
             full_length = len(tokens)
-            return length_preference_function(
-                thinking_length, preferred_length=256 - 10, scaling=1
-            ) + length_preference_function(
-                full_length, preferred_length=256 - 10, scaling=1
+            return 0.5 * length_preference_function(
+                thinking_length, preferred_length=256 - 10, scaling=0.95
+            ) + 0.5 * length_preference_function(
+                full_length, preferred_length=256 - 10, scaling=0.95
             )
 
         return [func(completion) for completion in completions]
 
     def format_func(prompts, completions, correct_answer, **kwargs):
         # each line of thinking text should be 100 characters
+        # -> [0, 1]
 
         def func(completion):
-            if "</think>" not in completion:
+            if not is_formatting_valid(completion):
                 return 0
-            if "oxed{" not in completion and "```python" not in completion:
-                return 0
-            if "oxed{" in completion and "```python" in completion:
-                return 0
+
             completion = completion[: completion.index("</think>")].strip()
 
             lines = completion.split("\n\n")
@@ -110,11 +146,16 @@ if __name__ == "__main__":
                 denominator += 100
             return numerator / denominator
 
-        return [func(completion) for completion in completions]
+        weight = get_formatting_weight()
+        return [weight * func(completion) for completion in completions]
 
     import re
 
     def correctness_function(completion, correct_answer):
+        # if there is an answer in the response, it should be correct
+        if not is_formatting_valid(completion):
+            return 0
+
         match = re.search(r"\\boxed\{(.*?)\}", completion)
         boxed_content = match.group(1) if match else ""
 
@@ -122,6 +163,7 @@ if __name__ == "__main__":
         answer_correct = boxed_content == str(correct_answer)
         contains_python_opening = "```python" in completion
         if not answer_attempt and not contains_python_opening:
+            # with is_formatting_valid, this branch is redundant
             return -0.5
 
         if not answer_attempt:
@@ -135,26 +177,12 @@ if __name__ == "__main__":
         # attempted answer and is correct
         return 1
 
-    correctness_func_counter = [0]
-    TOTAL_CALLS_ESTIMATED = len(dataset) // (
-        CAPACITY_PER_GPU * TRAIN_NUM_GPUS // NUM_GENERATIONS
-    )  # evaluation counts not considered
-    CALLS_UNTIL_CONSIDER_CORRECTNESS = TOTAL_CALLS_ESTIMATED // 4
-    CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY = TOTAL_CALLS_ESTIMATED
-
     def correctness_func(prompts, completions, correct_answer, **kwargs):
         # the answer should be correct
 
-        correctness_func_counter[0] += 1
-        factor = (correctness_func_counter[0] - CALLS_UNTIL_CONSIDER_CORRECTNESS) / (
-            CALLS_UNTIL_CONSIDER_CORRECTNESS_FULLY - CALLS_UNTIL_CONSIDER_CORRECTNESS
-        )
-        if correctness_func_counter[0] <= CALLS_UNTIL_CONSIDER_CORRECTNESS:
-            # do not consider correctness until a certain number of calls
-            factor = 0
-
+        weight = get_correctness_weight()
         return [
-            factor * correctness_function(completion, correct_answer_)
+            weight * correctness_function(completion, correct_answer_)
             for completion, correct_answer_ in zip(completions, correct_answer)
         ]
 
