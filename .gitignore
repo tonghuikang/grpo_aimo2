@@ -1,6 +1,6 @@
 *.ipynb
 !reference.csv
 !reference_alt.csv
-!evaluation_dataset.csv
+!reward_evaluation_dataset.csv
 !training_dataset_justcopy.csv
 !AIME_Dataset_1983_2024.csv

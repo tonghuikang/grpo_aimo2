@@ -47,7 +47,7 @@ if __name__ == "__main__":
     import datasets
 
     dataset = datasets.Dataset.from_csv("training_dataset.csv")
-    evaluation_dataset = datasets.Dataset.from_csv("evaluation_dataset.csv")
+    evaluation_dataset = datasets.Dataset.from_csv("reward_evaluation_dataset.csv")
     # dataset = datasets.load_dataset("trl-lib/tldr", split="train")
     # dataset = dataset.select(range(1600))
 
@@ -130,6 +130,9 @@ if __name__ == "__main__":
         # logging configs
         report_to="wandb",
         log_completions=True,
+        eval_on_start=True,
+        eval_strategy="steps",
+        eval_steps=16,
     )
 
     # Now initialize the trainer

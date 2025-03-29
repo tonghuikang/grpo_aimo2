@@ -32,7 +32,7 @@ image = (
     .add_local_file("./train_grpo.py", "/root/train_grpo.py")
     .add_local_file("./train_config.py", "/root/train_config.py")
     .add_local_file("./training_dataset.csv", "/root/training_dataset.csv")
-    .add_local_file("./evaluation_dataset.csv", "/root/evaluation_dataset.csv")
+    .add_local_file("./reward_evaluation_dataset.csv", "/root/reward_evaluation_dataset.csv")
     .add_local_file("/Users/htong/.netrc", "/root/.netrc")  # for wandb credentials
     .add_local_file("/Users/htong/.kaggle/kaggle.json", "/root/kaggle/kaggle.json")
 )
