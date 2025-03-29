@@ -189,7 +189,10 @@ if is_on_modal():
     start_time = time.time()
     final_cutoff_time = start_time + len(df_reference) * 3 * 60
     cutoff_times = [
-        int(x) for x in np.linspace(final_cutoff_time, start_time + 4 * 60, len(df_reference) + 1)
+        int(x)
+        for x in np.linspace(
+            final_cutoff_time, start_time + 4 * 60, len(df_reference) + 1
+        )
     ]  # 4 minutes loading time at the start
     cutoff_times.pop()
 

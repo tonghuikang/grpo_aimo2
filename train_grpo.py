@@ -53,44 +53,82 @@ if __name__ == "__main__":
 
     import math
 
-    def length_preference_function(length, preferred_length=256, ceiling=1.0):
+    def length_preference_function(length, preferred_length=256, ceiling=1.0, scaling=1/3):
         # maps [0,inf] -> [0,1]
         x = length / preferred_length
         y = math.e * x * math.exp(-x)
-        return (min(y, ceiling)) ** (1 / 3) / ceiling
+        return (min(y, ceiling)) ** (scaling) / ceiling
+
+    def formatting_func(prompts, completions, correct_answer, **kwargs):
+        # each line of thinking text should be 100 characters
+
+        def func(completion):
+            if "</think>" not in completion:
+                return 0
+            completion = completion[: completion.index("</think>")].strip()
+
+            lines = completion.split("\n\n")
+            denominator = 1
+            numerator = 1
+            for line in lines:
+                length = len(line)
+                score = length_preference_function(length, preferred_length=100, scaling=1)
+                numerator += score * length
+                denominator += length
+            return numerator / denominator
+
+        return [func(completion) for completion in completions]
+
+    import math
+
+    def length_func(prompts, completions, correct_answer, **kwargs):
+        # the output should be around 256 tokens
+
+        def func(completion):
+            relevant_index = len(completion)
+            contains_python_opening = "```python" in completion
+            if contains_python_opening:
+                relevant_index = completion.index("```python")
+            completion_length = len(tokenizer.encode(completion[:relevant_index]))
+            return length_preference_function(completion_length)
+
+        return [func(completion) for completion in completions]
 
     import re
 
-    def reward_func_individual(completion, correct_answer):
-        match = re.search(r"\\boxed\{(.*?)\}", completion)
-        boxed_content = match.group(1) if match else ""
+    correctness_func_counter = [0]
 
-        answer_attempt = bool(boxed_content != "")
-        answer_correct = boxed_content == str(correct_answer)
+    def correctness_func(prompts, completions, correct_answer, **kwargs):
+        # the answer should be correct
 
-        relevant_index = len(completion)
-        contains_python_opening = "```python" in completion
-        if contains_python_opening:
-            relevant_index = completion.index("```python")
-        completion_length = len(tokenizer.encode(completion[:relevant_index]))
+        # do not consider correctness until a certain number of calls
+        correctness_func_counter[0] += 1
+        if correctness_func_counter[0] < 10_000:
+            return [0 for _ in completions]  # Return a list of zeros with the same length as completions
 
-        if not answer_attempt and not contains_python_opening:
-            return -5
+        def func(completion, correct_answer):
+            match = re.search(r"\\boxed\{(.*?)\}", completion)
+            boxed_content = match.group(1) if match else ""
 
-        if not answer_attempt:
-            # penalize long sequences, likely attempting to solve on its own
-            # not sure if it affects the math sequences
-            return 0  # -0.5 + length_preference_function(completion_length)
+            answer_attempt = bool(boxed_content != "")
+            answer_correct = boxed_content == str(correct_answer)
+            contains_python_opening = "```python" in completion
+            if not answer_attempt and not contains_python_opening:
+                return -0.5
 
-        if not answer_correct:
-            return -10
+            if not answer_attempt:
+                # penalize long sequences, likely attempting to solve on its own
+                # not sure if it affects the math sequences
+                return 0
 
-        # attempted answer and is correct
-        return 10  # 9.5 + length_preference_function(completion_length)
+            if not answer_correct:
+                return -1
 
-    def reward_func(prompts, completions, correct_answer, **kwargs):
+            # attempted answer and is correct
+            return 1
+
         return [
-            reward_func_individual(completion, correct_answer_)
+            func(completion, correct_answer_)
             for completion, correct_answer_ in zip(completions, correct_answer)
         ]
 
@@ -124,7 +162,7 @@ if __name__ == "__main__":
         learning_rate=learning_rate,
         epsilon_high=0.28,
         beta=0.1,
-        scale_rewards=False,
+        scale_rewards=True,
         # vllm configs
         use_vllm=True,
         # logging configs
@@ -138,7 +176,11 @@ if __name__ == "__main__":
     # Now initialize the trainer
     trainer = GRPOTrainer(
         model=model,
-        reward_funcs=reward_func,
+        reward_funcs=[
+            formatting_func,
+            length_func,
+            correctness_func,
+        ],
         args=training_args,
         train_dataset=dataset,
         eval_dataset=evaluation_dataset,
