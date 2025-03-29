@@ -77,10 +77,10 @@ if __name__ == "__main__":
         return MAX_CORRECTNESS_WEIGHT * factor
 
     def get_length_weight():
-        return (1 - get_correctness_weight(increment=False)) // 2
+        return (1 - get_correctness_weight(increment=False)) / 2
 
     def get_formatting_weight():
-        return (1 - get_correctness_weight(increment=False)) // 2
+        return (1 - get_correctness_weight(increment=False)) / 2
 
     # helper functions for reward
 
@@ -103,51 +103,61 @@ if __name__ == "__main__":
             return False
         return True
 
-    def length_func(prompts, completions, correct_answer, **kwargs):
-        # the thinking part should be around 256 tokens
-        # the full completion should be around 256 tokens
-        # -> [0, 1]
+    def length_function(completion):
+        if not is_formatting_valid(completion):
+            return 0
+        tokens = tokenizer.encode(completion)
+        thinking_length = tokens.index(151649)  # </think>
+        full_length = len(tokens)
+        return 0.5 * length_preference_function(
+            thinking_length, preferred_length=256 - 10, scaling=0.95
+        ) + 0.5 * length_preference_function(
+            full_length, preferred_length=256, scaling=0.95
+        )
 
-        def func(completion):
-            if not is_formatting_valid(completion):
-                return 0
-            tokens = tokenizer.encode(completion)
-            thinking_length = tokens.index(151649)  # </think>
-            full_length = len(tokens)
-            return 0.5 * length_preference_function(
-                thinking_length, preferred_length=256 - 10, scaling=0.95
-            ) + 0.5 * length_preference_function(
-                full_length, preferred_length=256 - 10, scaling=0.95
-            )
+    def formatting_function(completion):
+        if not is_formatting_valid(completion):
+            return 0
 
-        return [func(completion) for completion in completions]
+        completion = completion[: completion.index("</think>")].strip()
 
-    def format_func(prompts, completions, correct_answer, **kwargs):
+        lines = completion.split("\n\n")
+        denominator = 1
+        numerator = 1
+        for line in lines:
+            length = len(line)
+            score = length_preference_function(length, preferred_length=100, scaling=0.90)
+            numerator += score * length
+            denominator += length
+            numerator += 100 * score
+            denominator += 100
+        return numerator / denominator
+
+    def style_func(prompts, completions, correct_answer, **kwargs):
+        # each line of thinking text should be 100 characters
+        # -> [0, formatting_weight + length_weight]
+
+        formatting_weight = get_formatting_weight()
+        length_weight = get_length_weight()
+        return [
+            formatting_weight * formatting_function(completion)
+            + length_weight * length_function(completion)
+            for completion in completions
+        ]
+
+    def formatting_ref(prompts, completions, correct_answer, **kwargs):
         # each line of thinking text should be 100 characters
         # -> [0, 1]
 
-        def func(completion):
-            if not is_formatting_valid(completion):
-                return 0
+        weight = 0.001
+        return [weight * formatting_function(completion) for completion in completions]
 
-            completion = completion[: completion.index("</think>")].strip()
+    def length_ref(prompts, completions, correct_answer, **kwargs):
+        # each line of thinking text should be 100 characters
+        # -> [0, 1]
 
-            lines = completion.split("\n\n")
-            denominator = 1
-            numerator = 1
-            for line in lines:
-                length = len(line)
-                score = length_preference_function(
-                    length, preferred_length=100, scaling=1
-                )
-                numerator += score * length
-                denominator += length
-                numerator += 100 * score
-                denominator += 100
-            return numerator / denominator
-
-        weight = get_formatting_weight()
-        return [weight * func(completion) for completion in completions]
+        weight = 0.001
+        return [weight * length_function(completion) for completion in completions]
 
     import re
 
@@ -224,7 +234,7 @@ if __name__ == "__main__":
         learning_rate=learning_rate,
         epsilon_high=0.28,
         beta=0.1,
-        scale_rewards=True,
+        scale_rewards=False,
         # vllm configs
         use_vllm=True,
         # logging configs
@@ -239,10 +249,11 @@ if __name__ == "__main__":
     trainer = GRPOTrainer(
         model=model,
         reward_funcs=[
-            format_func,
-            length_func,
+            style_func,
             correctness_func,
-            # counter_func,
+            # reference functions
+            formatting_ref,
+            length_ref,
             correctness_ref,
         ],
         args=training_args,
