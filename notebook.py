@@ -64,16 +64,19 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
     (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
 ]
 
-# Deploy a single 7b model
-MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
-]
+MATH_EXECUTION_COUNT = 8
+CODE_EXECUTION_COUNT = 8
 
-# Deploy a single 2 x 7b model
-MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
-    (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
-]
+# # Deploy a single 7b model
+# MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
+# ]
+
+# # Deploy a single 2 x 7b model
+# MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
+# ]
 
 # # Deploy a 4 x 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
@@ -85,8 +88,8 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
 
 
 MAX_MODEL_LEN = 8192 * 2
-MATH_EXECUTION_COUNT = 32
-CODE_EXECUTION_COUNT = 0
+MATH_EXECUTION_COUNT = 16
+CODE_EXECUTION_COUNT = 16
 MAX_NUM_SEQS = 32
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
@@ -351,6 +354,20 @@ def redact_sections(text: str) -> str:
     # pattern = r"```<think>(.*?)</think>"
     # text = re.sub(pattern, "[THOUGHTS REDACTED]", text, flags=re.DOTALL)
     return text
+
+
+def extract_sections(text, tags=["python", "output"]):
+    import re
+
+    # Pattern to match either the blocks
+    tags_pattern = "|".join(tags)
+    pattern = rf"```({tags_pattern})\s*(.*?)```"
+
+    # Find all matches preserving their order (sequence)
+    matches = re.findall(pattern, text, re.DOTALL)
+
+    # Each match is a tuple (tag, content)
+    return "".join(text for _, text in matches)
 
 
 def extract_code(text: str) -> str:
@@ -887,8 +904,12 @@ Let me go through my code step by step.
 Looking at my code,
 """.strip()
 
+from typing import Optional
 
-def run_code_worker(question: str, generation_idx: int = 0) -> str:
+
+def run_code_worker(
+    question: str, generation_idx: int = 0, original_question: Optional[str] = None
+) -> str:
     """
     Execute the code worker logic directly as a function
     Returns the answer as a string and updates global code_results
@@ -896,6 +917,9 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     global code_results
     global generation_logs
     import time
+
+    if original_question is None:
+        original_question = question
 
     question_start_time = time.time()
 
@@ -940,7 +964,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
                     question=question
                 )
                 add_text_chunk(reset_chunk, reset_buffer=True)
-        if question != current_question:
+        if original_question != current_question:
             break
         if request_counter > 20:
             break
@@ -969,7 +993,7 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
             token_counter += 1
             chunk_text = chunk.choices[0].text
 
-            if question != current_question:
+            if original_question != current_question:
                 break
             blocking_from_completion = False
             added_string_complete_code = does_added_string_complete_code(
@@ -1144,6 +1168,11 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         code_results[question].append(answer)
         generation_logs[question].extend(generation_logs_local)
 
+    question_modified = question + "\n\n" + extract_sections(prompt)
+    run_math_worker(
+        question_modified, generation_idx=generation_idx, original_question=question
+    )
+
     return answer
 
 
@@ -1168,7 +1197,9 @@ After you get your final answer, take modulo 1000, and return the final answer w
 <｜Assistant｜><think>"""
 
 
-def run_math_worker(question: str, generation_idx: int = 0) -> str:
+def run_math_worker(
+    question: str, generation_idx: int = 0, original_question: Optional[str] = None
+) -> str:
     """
     Execute the math worker logic directly as a function
     Returns the answer as a string and updates global math_results
@@ -1176,6 +1207,9 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
     global math_results
     global generation_logs
     import time
+
+    if original_question is None:
+        original_question = question
 
     question_start_time = time.time()
 
@@ -1194,7 +1228,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
     request_counter = 0
     token_counter = 0
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
-        if question != current_question:
+        if original_question != current_question:
             break
 
         if request_counter > 20:
@@ -1216,7 +1250,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
                 # no check for is_valid_answer_string here
                 break
 
-            if question != current_question:
+            if original_question != current_question:
                 break
 
         # Log the state after each completion stream
@@ -1385,7 +1419,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
 
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
-    if selected_questions_only and is_on_kaggle() and not is_on_kaggle_submission():
+    if selected_questions_only and not is_on_kaggle_submission():
         # if "Fred" not in question and "Triangle" not in question:
         #     return 210
         # if "Triangle" not in question:
@@ -1415,6 +1449,8 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         if time.time() > cutoff_times[-1]:
             break
 
+        time.sleep(20)
+
         # Make thread-safe copies of current results
         with results_lock:
             current_math_results = math_results[question].copy()
@@ -1438,8 +1474,6 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
             # the code attempts might be stuck in a loop
             # do not wait for those, otherwise we could only rely on time
             break
-
-        time.sleep(20)
 
     # Get thread-safe copies for final answer selection
     with results_lock:
