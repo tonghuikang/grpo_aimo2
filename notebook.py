@@ -60,17 +60,16 @@ if is_on_modal():
 
 # %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:21:29.298270Z","iopub.execute_input":"2025-03-30T09:21:29.298571Z","iopub.status.idle":"2025-03-30T09:21:29.303501Z","shell.execute_reply.started":"2025-03-30T09:21:29.298548Z","shell.execute_reply":"2025-03-30T09:21:29.302744Z"}}
 # Deploy a single 32b model
-MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
-]
-
-MATH_EXECUTION_COUNT = 8
-CODE_EXECUTION_COUNT = 8
-
-# # Deploy a single 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
+#     (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
 # ]
+# MATH_EXECUTION_COUNT = 8
+# CODE_EXECUTION_COUNT = 8
+
+# Deploy a single 7b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
+]
 
 # # Deploy a single 2 x 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
@@ -961,7 +960,7 @@ def run_code_worker(
             else:
                 already_deferred_to_math = True
                 reset_chunk = "<｜end▁of▁sentence｜>" + math_initial_prompt.format(
-                    question=question
+                    question=original_question
                 )
                 add_text_chunk(reset_chunk, reset_buffer=True)
         if original_question != current_question:
@@ -980,7 +979,7 @@ def run_code_worker(
 
         request_counter += 1
         generation_log = {
-            "question": question,
+            "question": original_question,
             "method": "code",
             "generation_idx": generation_idx,
             "elapsed": prompt,
@@ -1145,7 +1144,7 @@ def run_code_worker(
 
     generation_logs_local.append(
         {
-            "question": question,
+            "question": original_question,
             "method": "code",
             "generation_idx": generation_idx,
             "timestamp": time.time() - question_start_time,
@@ -1155,22 +1154,22 @@ def run_code_worker(
             "request_counter": request_counter,
             "token_counter": token_counter,
             "flag_for_training": False,
-            "reason": "final" if question == current_question else "terminated",
+            "reason": "final" if original_question == current_question else "terminated",
         }
     )
     for generation_log in generation_logs_local:
         generation_log["eventual_answer"] = answer if answer is not None else -1
     for generation_log in generation_logs_local:
-        generation_log["correct_answer"] = question_to_answer_map.get(question, "")
+        generation_log["correct_answer"] = question_to_answer_map.get(original_question, "")
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
-        code_results[question].append(answer)
-        generation_logs[question].extend(generation_logs_local)
+        code_results[original_question].append(answer)
+        generation_logs[original_question].extend(generation_logs_local)
 
-    question_modified = question + "\n\n" + extract_sections(prompt)
+    question_modified = original_question + "\n\n" + extract_sections(prompt)
     run_math_worker(
-        question_modified, generation_idx=generation_idx, original_question=question
+        question_modified, generation_idx=generation_idx, original_question=original_question
     )
 
     return answer
@@ -1256,7 +1255,7 @@ def run_math_worker(
         # Log the state after each completion stream
         generation_logs_local.append(
             {
-                "question": question,
+                "question": original_question,
                 "method": "math",
                 "generation_idx": generation_idx,
                 "timestamp": time.time() - question_start_time,
@@ -1279,7 +1278,7 @@ def run_math_worker(
     # ----- Final log entry -----
     generation_logs_local.append(
         {
-            "question": question,
+            "question": original_question,
             "method": "math",
             "generation_idx": generation_idx,
             "timestamp": time.time() - question_start_time,
@@ -1296,12 +1295,12 @@ def run_math_worker(
     for generation_log in generation_logs_local:
         generation_log["eventual_answer"] = answer
     for generation_log in generation_logs_local:
-        generation_log["correct_answer"] = question_to_answer_map.get(question, "")
+        generation_log["correct_answer"] = question_to_answer_map.get(original_question, "")
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
-        math_results[question].append(answer)
-        generation_logs[question].extend(generation_logs_local)
+        math_results[original_question].append(answer)
+        generation_logs[original_question].extend(generation_logs_local)
 
     return answer
 
@@ -1420,12 +1419,12 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
     if selected_questions_only and not is_on_kaggle_submission():
-        # if "Fred" not in question and "Triangle" not in question:
-        #     return 210
+        if "Fred" not in question:
+            return 210
         # if "Triangle" not in question:
         #     return 210
-        if "circumcircle" not in question:
-            return 210
+        # if "circumcircle" not in question:
+        #     return 210
         # if "Triangle" not in question and "circumcircle" not in question:
         #     return 210
 
