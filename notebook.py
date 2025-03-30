@@ -1399,11 +1399,14 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         return 210
 
     threads = []
-    for generation_idx in range(MATH_EXECUTION_COUNT):
+    generation_idx = 0
+    for _ in range(MATH_EXECUTION_COUNT):
+        generation_idx += 1
         thread = start_math_execution(question, generation_idx)
         threads.append(thread)
 
-    for generation_idx in range(CODE_EXECUTION_COUNT):
+    for _ in range(CODE_EXECUTION_COUNT):
+        generation_idx += 1
         thread = start_code_execution(question, generation_idx)
         threads.append(thread)
 
@@ -1544,9 +1547,6 @@ import time
 if is_on_kaggle() and not is_on_kaggle_submission():
     # Reset global result arrays
     with results_lock:
-        math_results[question] = []
-        code_results[question] = []
-        generation_logs[question] = []
         current_question = "ENDED"
 
     time.sleep(20)  # allow sequences to terminate
