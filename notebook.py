@@ -4,7 +4,7 @@
 # - https://www.kaggle.com/code/richolson/ai-math-olympiad-qwen2-5-72b for showing how to submit
 # - https://www.kaggle.com/code/abdullahmeda/load-72b-awq-model-using-vllm-on-l4-x4
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-25T02:51:41.530426Z","iopub.execute_input":"2025-03-25T02:51:41.530619Z","iopub.status.idle":"2025-03-25T02:51:42.941049Z","shell.execute_reply.started":"2025-03-25T02:51:41.530600Z","shell.execute_reply":"2025-03-25T02:51:42.940185Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:22.443420Z","iopub.execute_input":"2025-03-30T09:16:22.443731Z","iopub.status.idle":"2025-03-30T09:16:22.577918Z","shell.execute_reply.started":"2025-03-30T09:16:22.443706Z","shell.execute_reply":"2025-03-30T09:16:22.577189Z"}}
 import os
 import glob
 import shutil
@@ -13,7 +13,7 @@ for file in glob.glob("/kaggle/usr/lib/pip-install-aimo2/triton/backends/nvidia/
     shutil.copy(file, "/usr/local/cuda/bin/")
     os.chmod(f"/usr/local/cuda/bin/{os.path.basename(file)}", 0o755)
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:42.941738Z","iopub.execute_input":"2025-03-25T02:51:42.941952Z","iopub.status.idle":"2025-03-25T02:51:44.528950Z","shell.execute_reply.started":"2025-03-25T02:51:42.941934Z","shell.execute_reply":"2025-03-25T02:51:44.528308Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:22.578800Z","iopub.execute_input":"2025-03-30T09:16:22.579049Z","iopub.status.idle":"2025-03-30T09:16:22.584376Z","shell.execute_reply.started":"2025-03-30T09:16:22.579026Z","shell.execute_reply":"2025-03-30T09:16:22.583771Z"}}
 import time
 import pandas as pd
 import polars as pl
@@ -30,93 +30,25 @@ cutoff_times.pop()
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Configs
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.529649Z","iopub.execute_input":"2025-03-25T02:51:44.529983Z","iopub.status.idle":"2025-03-25T02:51:44.551380Z","shell.execute_reply.started":"2025-03-25T02:51:44.529963Z","shell.execute_reply":"2025-03-25T02:51:44.550690Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:22.585507Z","iopub.execute_input":"2025-03-30T09:16:22.585716Z","iopub.status.idle":"2025-03-30T09:16:22.758115Z","shell.execute_reply.started":"2025-03-30T09:16:22.585697Z","shell.execute_reply":"2025-03-30T09:16:22.757408Z"}}
 # Checklist for GPU commits - LLM_SERVER_URL_MAIN, INTERNET, ACCELERATOR
 
 MODEL_PATHS: list[str] = [
-    # will be overridden in Modal environment
-    "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # code
+    # will be overridden in Modal environment using MODEL_NAMES
+    "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1",  # code
     "/kaggle/input/deepseek-r1/transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",  # math
     "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
 ]
 
 MODEL_NAMES: list[str] = [
-    "casperhansen/deepseek-r1-distill-qwen-7b-awq",
+    "casperhansen/deepseek-r1-distill-qwen-32b-awq",
     "casperhansen/deepseek-r1-distill-qwen-7b-awq",
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
 ]
 
-LLM_SERVER_URLS: list[str] = [
-    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1",
-    "https://tonghuikang--example-vllm-openai-compatible-salt1337-serve.modal.run/v1",
-    "/kaggle/input/m/deepseek-ai/deepseek-r1/transformers/deepseek-r1-distill-qwen-1.5b/1",  # classifier
-]
-
-PORT_IDS: list[int] = [
-    8000,
-    8001,
-    8002,
-]
-
-LLM_SERVER_URLS: list[str] = [
-    # comment out this whole block if using remote LLM
-    # may be overridden in Modal environment
-    f"http://0.0.0.0:{PORT_IDS[0]}/v1",  # math
-    f"http://0.0.0.0:{PORT_IDS[1]}/v1",  # code
-    f"http://0.0.0.0:{PORT_IDS[2]}/v1",  # clf
-]
-
-GPU_ASSIGNMENT: list[list] = [
-    # will be overridden in Modal environment
-    [0, 1],
-    [2],
-    [3],
-]
-
-USE_LOCAL_LLM = "0.0.0.0" in LLM_SERVER_URLS[0]
-
-MAX_MODEL_LEN = 8192 * 2
-MATH_EXECUTION_COUNT = 16
-CODE_EXECUTION_COUNT = 12
-
-
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
-
 
 def is_on_modal() -> bool:
     return bool(os.getenv("MODAL_ENVIRONMENT"))
-
-
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
-
-
-if is_on_modal():
-    # if we want to use a different model to generate classification input
-    MODEL_NAMES[1] = "casperhansen/deepseek-r1-distill-qwen-7b-awq"
-    CODE_EXECUTION_COUNT = 72
-
-    # MODEL_NAMES[1] = "casperhansen/deepseek-r1-distill-qwen-32b-awq"
-    # CODE_EXECUTION_COUNT = 12
-
-    # MODEL_NAMES[1] = "Qwen/QwQ-32B-AWQ"  # note: for generating data only
-    # CODE_EXECUTION_COUNT = 12
-    # MAX_MODEL_LEN = 8192 * 2
-
-if is_on_modal():
-    # Use the same model for inference and classification
-    LLM_SERVER_URLS[2] = LLM_SERVER_URLS[1]  # use the same model
-    MODEL_NAMES[2] = MODEL_NAMES[1]
-
-    GPU_ASSIGNMENT: list[list] = [
-        [],
-        [0],
-        [],
-    ]
-
-
-if is_on_modal():
-    # not computing math trajectories
-    MATH_EXECUTION_COUNT = 0
 
 
 if is_on_modal():
@@ -126,19 +58,29 @@ if is_on_modal():
         os.path.join(MODELS_DIR, model_name) for model_name in MODEL_NAMES
     ]
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:21:29.298270Z","iopub.execute_input":"2025-03-30T09:21:29.298571Z","iopub.status.idle":"2025-03-30T09:21:29.303501Z","shell.execute_reply.started":"2025-03-30T09:21:29.298548Z","shell.execute_reply":"2025-03-30T09:21:29.302744Z"}}
+# Deploy a single 32b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
+]
 
-if len(GPU_ASSIGNMENT[0]) == 0:
-    assert MATH_EXECUTION_COUNT == 0
+# Deploy a 4 x 7b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[1], MODEL_PATHS[1], [0]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [1]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [2]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [3]),
+]
 
-if len(GPU_ASSIGNMENT[1]) == 0:
-    assert CODE_EXECUTION_COUNT == 0
 
+MAX_MODEL_LEN = 8192 * 2
+MATH_EXECUTION_COUNT = 16
+CODE_EXECUTION_COUNT = 12
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.552693Z","iopub.execute_input":"2025-03-25T02:51:44.552896Z","iopub.status.idle":"2025-03-25T02:51:44.556954Z","shell.execute_reply.started":"2025-03-25T02:51:44.552878Z","shell.execute_reply":"2025-03-25T02:51:44.556293Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:22.773296Z","iopub.execute_input":"2025-03-30T09:16:22.773510Z","iopub.status.idle":"2025-03-30T09:16:22.784514Z","shell.execute_reply.started":"2025-03-30T09:16:22.773491Z","shell.execute_reply":"2025-03-30T09:16:22.783929Z"}}
 import os
 
 # Possible environments
@@ -204,8 +146,9 @@ question_to_answer_map: dict[str, str] = dict(
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # vLLM Serving
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:51:44.557764Z","iopub.execute_input":"2025-03-25T02:51:44.557962Z","iopub.status.idle":"2025-03-25T02:51:44.582792Z","shell.execute_reply.started":"2025-03-25T02:51:44.557944Z","shell.execute_reply":"2025-03-25T02:51:44.582155Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:21:45.999344Z","iopub.execute_input":"2025-03-30T09:21:45.999660Z","iopub.status.idle":"2025-03-30T09:21:46.245479Z","shell.execute_reply.started":"2025-03-30T09:21:45.999635Z","shell.execute_reply":"2025-03-30T09:21:46.244774Z"}}
 import os
+from typing import Optional
 
 os.environ["TRITON_PTXAS_PATH"] = "/usr/local/cuda/bin/ptxas"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -266,53 +209,50 @@ def start_model(
     return process
 
 
-if (is_on_kaggle() or is_on_modal()) and USE_LOCAL_LLM:
-    print("Starting main vLLM servers")
-    # math
-    config_idx = 0
-    if len(GPU_ASSIGNMENT[config_idx]) > 0:
+from typing import Callable
+from openai import OpenAI, Stream
+from openai.types import Completion
+
+clients: list[OpenAI] = []
+
+stream_funcs: list = []
+if is_on_kaggle() or is_on_modal():
+    print("Starting vLLM servers")
+
+    port = 8000
+    for idx, (model_name, model_path, gpu_ids) in enumerate(MODEL_NAMES_PATHS_GPUS):
         process = start_model(
-            gpu_ids=GPU_ASSIGNMENT[config_idx],
-            model_path=MODEL_PATHS[config_idx],
-            model_name=MODEL_NAMES[config_idx],
+            gpu_ids=gpu_ids,
+            model_path=model_path,
+            model_name=model_name,
             max_model_len=MAX_MODEL_LEN,
             max_num_seqs=max(1, MATH_EXECUTION_COUNT),
             gpu_memory_utilization=0.90,
-            logfile_suffix="math",
-            port=PORT_IDS[config_idx],
+            logfile_suffix=f"{idx}",
+            port=port,
         )
+        client = OpenAI(base_url=f"http://0.0.0.0:{port}/v1", api_key="aimo")
+        clients.append(client)
 
-    # code
-    config_idx = 1
-    if len(GPU_ASSIGNMENT[config_idx]) > 0:
-        process = start_model(
-            gpu_ids=GPU_ASSIGNMENT[config_idx],
-            model_path=MODEL_PATHS[config_idx],
-            model_name=MODEL_NAMES[config_idx],
-            max_model_len=MAX_MODEL_LEN,
-            max_num_seqs=max(1, CODE_EXECUTION_COUNT),
-            gpu_memory_utilization=0.90,
-            logfile_suffix="code",
-            port=PORT_IDS[config_idx],
-        )
+        def stream_func(
+            prompt: str, stop: Optional[str] = None
+        ) -> Callable[[str, Optional[str]], Stream[Completion]]:
+            return client.completions.create(
+                model=model_name,
+                prompt=prompt,
+                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
+                temperature=1.0,
+                stream=True,
+                stop=stop,
+            )
 
-    # clf
-    config_idx = 2
-    if len(GPU_ASSIGNMENT[config_idx]) > 0:
-        process = start_model(
-            gpu_ids=GPU_ASSIGNMENT[config_idx],
-            model_path=MODEL_PATHS[config_idx],
-            model_name=MODEL_NAMES[config_idx],
-            max_model_len=MAX_MODEL_LEN,
-            max_num_seqs=max(1, CODE_EXECUTION_COUNT),
-            gpu_memory_utilization=0.90,
-            logfile_suffix="clf",
-            port=PORT_IDS[config_idx],
-        )
+        stream_funcs.append(stream_func)
+
+        port += 1
 else:
     print("Using remote vLLM server")
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-25T02:51:44.583384Z","iopub.execute_input":"2025-03-25T02:51:44.583572Z","iopub.status.idle":"2025-03-25T02:52:19.923354Z","shell.execute_reply.started":"2025-03-25T02:51:44.583555Z","shell.execute_reply":"2025-03-25T02:52:19.922559Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:18:10.407757Z","iopub.execute_input":"2025-03-30T09:18:10.408095Z","iopub.status.idle":"2025-03-30T09:18:23.497753Z","shell.execute_reply.started":"2025-03-30T09:18:10.408067Z","shell.execute_reply":"2025-03-30T09:18:23.496931Z"}}
 import os
 from typing import Optional
 
@@ -341,29 +281,17 @@ def count_tokens(text: str) -> int:
     # You can ignore the warning
     return len(tokenizer.encode(text))
 
-
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:19.924092Z","iopub.execute_input":"2025-03-25T02:52:19.924498Z","iopub.status.idle":"2025-03-25T02:52:27.404922Z","shell.execute_reply.started":"2025-03-25T02:52:19.924475Z","shell.execute_reply":"2025-03-25T02:52:27.404188Z"},"jupyter":{"outputs_hidden":false}}
-from openai import OpenAI, APIConnectionError
-
-client_math = OpenAI(base_url=LLM_SERVER_URLS[0], api_key="aimo")
-client_code = OpenAI(base_url=LLM_SERVER_URLS[1], api_key="aimo")
-client_clf = OpenAI(base_url=LLM_SERVER_URLS[2], api_key="aimo")
-
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-25T02:52:27.405618Z","iopub.execute_input":"2025-03-25T02:52:27.405833Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.613774Z","iopub.status.idle":"2025-03-30T09:16:23.614033Z","shell.execute_reply":"2025-03-30T09:16:23.613931Z"}}
 import time
+from openai import OpenAI, APIConnectionError
 
 if is_on_kaggle() or is_on_modal():
     num_retries_to_load = 10 * 60
     while num_retries_to_load > 0:
         num_retries_to_load -= 1
         try:
-            if len(GPU_ASSIGNMENT[0]) > 0:
-                print(client_math.models.list())
-            if len(GPU_ASSIGNMENT[1]) > 0:
-                print(client_code.models.list())
-            if len(GPU_ASSIGNMENT[2]) > 0:
-                print(client_clf.models.list())
-            break
+            for client in clients:
+                print(client.models.list())
         except APIConnectionError as e:
             time.sleep(1)
             if num_retries_to_load == 0:
@@ -373,7 +301,7 @@ if is_on_kaggle() or is_on_modal():
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Helper functions
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:47:51.266851Z","iopub.execute_input":"2025-03-19T08:47:51.267173Z","iopub.status.idle":"2025-03-19T08:48:54.034972Z","shell.execute_reply.started":"2025-03-19T08:47:51.267147Z","shell.execute_reply":"2025-03-19T08:48:54.034193Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.614610Z","iopub.status.idle":"2025-03-30T09:16:23.614848Z","shell.execute_reply":"2025-03-30T09:16:23.614749Z"}}
 # ----- Text Processing Functions -----
 
 
@@ -879,11 +807,10 @@ def truncate_paragraph(output):
         )
     return output_new
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Code worker
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:50:10.907856Z","iopub.execute_input":"2025-03-19T08:50:10.908176Z","iopub.status.idle":"2025-03-19T08:50:10.921696Z","shell.execute_reply.started":"2025-03-19T08:50:10.908145Z","shell.execute_reply":"2025-03-19T08:50:10.921036Z"},"_kg_hide-input":false,"jupyter":{"outputs_hidden":false}}
+# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.615503Z","iopub.status.idle":"2025-03-30T09:16:23.615743Z","shell.execute_reply":"2025-03-30T09:16:23.615645Z"}}
 # NOTE: <｜begin▁of▁sentence｜> is intentionally omitted - https://github.com/vllm-project/vllm/issues/12985
 code_initial_prompt = """
 <｜User｜>
@@ -978,11 +905,19 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
     flag_for_training = False
     request_counter = 0
     token_counter = 0
+    already_deferred_to_math = False
 
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
         answer = extract_boxed_text(redact_sections(prompt))
         if answer and is_valid_answer_string(answer):
-            break
+            if already_deferred_to_math:
+                break
+            else:
+                already_deferred_to_math = True
+                reset_chunk = "<｜end▁of▁sentence｜>" + math_initial_prompt.format(
+                    question=question
+                )
+                add_text_chunk(reset_chunk, reset_buffer=True)
         if question != current_question:
             break
         if request_counter > 20:
@@ -991,22 +926,11 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         last_attempted_prompt = prompt
 
         if not flag_for_training:
-            stream = client_code.completions.create(
-                model=MODEL_NAMES[1],
-                prompt=prompt,
-                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
-                temperature=1.0,
-                stream=True,
-            )
+            stream_func = stream_funcs[generation_idx % len(clients)]
+            stream = stream_func(prompt)
         else:
-            stream = client_clf.completions.create(
-                model=MODEL_NAMES[2],
-                prompt=prompt,
-                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
-                temperature=1.0,
-                stream=True,
-                stop="```python",  # returned text will not contain the stop sequence
-            )
+            stream_func = stream_funcs[generation_idx % len(clients)]
+            stream = stream_func(prompt, stop="```python")
 
         request_counter += 1
         generation_log = {
@@ -1200,11 +1124,10 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Math worker
 
-# %% [code] {"_kg_hide-input":false,"execution":{"iopub.status.busy":"2025-03-19T08:50:12.489994Z","iopub.execute_input":"2025-03-19T08:50:12.490298Z","iopub.status.idle":"2025-03-19T08:50:12.495733Z","shell.execute_reply.started":"2025-03-19T08:50:12.490274Z","shell.execute_reply":"2025-03-19T08:50:12.495098Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.616157Z","iopub.status.idle":"2025-03-30T09:16:23.616396Z","shell.execute_reply":"2025-03-30T09:16:23.616299Z"}}
 # NOTE: <｜begin▁of▁sentence｜> is intentionally omitted - https://github.com/vllm-project/vllm/issues/12985
 math_initial_prompt = """
 <｜User｜>
@@ -1255,13 +1178,8 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
             break
 
         request_counter += 1
-        stream = client_math.completions.create(
-            model=MODEL_NAMES[0],
-            prompt=prompt,
-            max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
-            temperature=1.0,
-            stream=True,
-        )
+        stream_func = stream_funcs[generation_idx % len(clients)]
+        stream = stream_func(prompt)
 
         for chunk in stream:
             chunk_text = chunk.choices[0].text
@@ -1330,11 +1248,10 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Control logic
 
-# %% [code] {"papermill":{"duration":0.016248,"end_time":"2024-12-14T00:03:20.989048","exception":false,"start_time":"2024-12-14T00:03:20.9728","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:50:13.798594Z","iopub.execute_input":"2025-03-19T08:50:13.798886Z","iopub.status.idle":"2025-03-19T08:50:13.810552Z","shell.execute_reply.started":"2025-03-19T08:50:13.798863Z","shell.execute_reply":"2025-03-19T08:50:13.809883Z"}}
+# %% [code] {"papermill":{"duration":0.016248,"end_time":"2024-12-14T00:03:20.989048","exception":false,"start_time":"2024-12-14T00:03:20.9728","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.616838Z","iopub.status.idle":"2025-03-30T09:16:23.617095Z","shell.execute_reply":"2025-03-30T09:16:23.616990Z"}}
 from typing import Optional
 from collections import defaultdict
 import random
@@ -1514,8 +1431,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     cutoff_times.pop()
     return answer  # Note: Do NOT return early, we NEED to pop cutoff_times
 
-
-# %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:50:17.432000Z","iopub.execute_input":"2025-03-19T08:50:17.432323Z","iopub.status.idle":"2025-03-19T08:50:17.436887Z","shell.execute_reply.started":"2025-03-19T08:50:17.432293Z","shell.execute_reply":"2025-03-19T08:50:17.436169Z"}}
+# %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.617643Z","iopub.status.idle":"2025-03-30T09:16:23.617893Z","shell.execute_reply":"2025-03-30T09:16:23.617779Z"}}
 import pandas as pd
 import polars as pl
 from typing import Union
@@ -1537,11 +1453,10 @@ def predict(
     print("------\n\n\n")
     return pl.DataFrame({"id": id_, "answer": answer})
 
-
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Local tests
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:50:18.973158Z","iopub.execute_input":"2025-03-19T08:50:18.973503Z","iopub.status.idle":"2025-03-19T08:50:18.977231Z","shell.execute_reply.started":"2025-03-19T08:50:18.973475Z","shell.execute_reply":"2025-03-19T08:50:18.976573Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.618342Z","iopub.status.idle":"2025-03-30T09:16:23.618574Z","shell.execute_reply":"2025-03-30T09:16:23.618478Z"}}
 if is_on_kaggle_interactive():
     question_sample = "Triangle $ABC$ has side length $AB = 120$ and circumradius $R = 100$. Let $D$ be the foot of the perpendicular from $C$ to the line $AB$. What is the smallest possible length of segment $CD$?"
     question_sample = "Fred and George take part in a tennis tournament with $4046$ other players. In each round, the players are paired into $2024$ matches. How many ways are there to arrange the first round such that Fred and George do not have to play each other? (Two arrangements for the first round are \textit{different} if there is a player with a different opponent in the two arrangements.)"
@@ -1551,21 +1466,21 @@ if is_on_kaggle_interactive():
         code_results[question_sample] = []
         generation_logs[question_sample] = []
 
-# %% [code] {"execution":{"iopub.status.busy":"2025-03-19T08:50:34.208896Z","iopub.execute_input":"2025-03-19T08:50:34.209197Z","iopub.status.idle":"2025-03-19T08:52:22.152911Z","shell.execute_reply.started":"2025-03-19T08:50:34.209171Z","shell.execute_reply":"2025-03-19T08:52:22.152191Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.619014Z","iopub.status.idle":"2025-03-30T09:16:23.619250Z","shell.execute_reply":"2025-03-30T09:16:23.619148Z"}}
 if is_on_kaggle_interactive():
     answer = run_math_worker(question_sample)
     print(answer)
 
-# %% [code] {"execution":{"execution_failed":"2025-03-19T09:14:09.209Z"},"jupyter":{"outputs_hidden":false}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.619615Z","iopub.status.idle":"2025-03-30T09:16:23.619836Z","shell.execute_reply":"2025-03-30T09:16:23.619743Z"}}
 if is_on_kaggle_interactive():
     answer = run_code_worker(question_sample)
     print(answer)
 
-# %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:57.643794Z","iopub.status.idle":"2025-03-19T08:43:57.644071Z","shell.execute_reply":"2025-03-19T08:43:57.643952Z"}}
+# %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.620316Z","iopub.status.idle":"2025-03-30T09:16:23.620549Z","shell.execute_reply":"2025-03-30T09:16:23.620454Z"}}
 if is_on_kaggle_interactive():
     predict_for_question(question_sample)
 
-# %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:57.643794Z","iopub.status.idle":"2025-03-19T08:43:57.644071Z","shell.execute_reply":"2025-03-19T08:43:57.643952Z"}}
+# %% [code] {"papermill":{"duration":0.012504,"end_time":"2024-12-14T00:03:21.030438","exception":false,"start_time":"2024-12-14T00:03:21.017934","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.620973Z","iopub.status.idle":"2025-03-30T09:16:23.621201Z","shell.execute_reply":"2025-03-30T09:16:23.621107Z"}}
 if is_on_modal():
     for question in question_to_answer_map:
         predict_for_question(question)
@@ -1574,8 +1489,7 @@ if is_on_modal():
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Prediction
 
-# %% [code] {"papermill":{"duration":1644.24778,"end_time":"2024-12-14T00:30:45.363503","exception":false,"start_time":"2024-12-14T00:03:21.115723","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-19T08:43:57.644707Z","iopub.status.idle":"2025-03-19T08:43:57.644954Z","shell.execute_reply":"2025-03-19T08:43:57.644854Z"}}
-
+# %% [code] {"papermill":{"duration":1644.24778,"end_time":"2024-12-14T00:30:45.363503","exception":false,"start_time":"2024-12-14T00:03:21.115723","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.621629Z","iopub.status.idle":"2025-03-30T09:16:23.621858Z","shell.execute_reply":"2025-03-30T09:16:23.621763Z"}}
 if is_on_kaggle():
     import kaggle_evaluation.aimo_2_inference_server
 
