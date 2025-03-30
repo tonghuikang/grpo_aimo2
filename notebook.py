@@ -64,19 +64,30 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
     (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
 ]
 
-# Deploy a 4 x 7b model
+# Deploy a single 7b model
 MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[1], MODEL_PATHS[1], [0]),
-    (MODEL_NAMES[1], MODEL_PATHS[1], [1]),
-    (MODEL_NAMES[1], MODEL_PATHS[1], [2]),
-    (MODEL_NAMES[1], MODEL_PATHS[1], [3]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
 ]
+
+# Deploy a single 2 x 7b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
+]
+
+# # Deploy a 4 x 7b model
+# MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [0]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [1]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [2]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [3]),
+# ]
 
 
 MAX_MODEL_LEN = 8192 * 2
-MATH_EXECUTION_COUNT = 16
-CODE_EXECUTION_COUNT = 12
-MAX_NUM_SEQS = 14
+MATH_EXECUTION_COUNT = 32
+CODE_EXECUTION_COUNT = 0
+MAX_NUM_SEQS = 32
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
@@ -1347,6 +1358,19 @@ generation_logs: dict[str, list[dict]] = {}
 results_lock = threading.Lock()  # Thread lock for protecting shared results
 
 
+def save_generation_logs() -> None:
+    generation_logs_all = []
+    for generation_logs_for_question in generation_logs.values():
+        generation_logs_all.extend(generation_logs_for_question)
+    if generation_logs_all:
+        df = pd.DataFrame(generation_logs_all)
+        df = df.sort_values(["question", "method", "generation_idx", "timestamp"])
+        df.to_csv(f"generation_logs.csv", index=False)
+        df[df["reason"] == "final"].to_csv(f"generation_logs_final.csv", index=False)
+        df[df["flag_for_training"]].to_csv(f"generation_logs_training.csv", index=False)
+
+
+# %% [code] {"papermill":{"duration":0.016248,"end_time":"2024-12-14T00:03:20.989048","exception":false,"start_time":"2024-12-14T00:03:20.9728","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:27.969103Z","iopub.execute_input":"2025-03-30T09:31:27.969397Z","iopub.status.idle":"2025-03-30T09:31:27.985200Z","shell.execute_reply.started":"2025-03-30T09:31:27.969373Z","shell.execute_reply":"2025-03-30T09:31:27.984493Z"}}
 def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     print(question)
     global math_results, code_results, generation_logs, current_question
@@ -1362,12 +1386,12 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
     if selected_questions_only and is_on_kaggle() and not is_on_kaggle_submission():
-        if "Fred" not in question and "Triangle" not in question:
-            return 210
+        # if "Fred" not in question and "Triangle" not in question:
+        #     return 210
         # if "Triangle" not in question:
         #     return 210
-        # if "circumcircle" not in question:
-        #     return 210
+        if "circumcircle" not in question:
+            return 210
         # if "Triangle" not in question and "circumcircle" not in question:
         #     return 210
 
@@ -1420,21 +1444,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
             math_results[question].copy() + code_results[question].copy()
         )
         if not is_on_kaggle_submission():
-            generation_logs_all = []
-            for generation_logs_for_question in generation_logs.values():
-                generation_logs_all.extend(generation_logs_for_question)
-            if generation_logs_all:
-                df = pd.DataFrame(generation_logs_all)
-                df = df.sort_values(
-                    ["question", "method", "generation_idx", "timestamp"]
-                )
-                df.to_csv(f"generation_logs.csv", index=False)
-                df[df["reason"] == "final"].to_csv(
-                    f"generation_logs_final.csv", index=False
-                )
-                df[df["flag_for_training"]].to_csv(
-                    f"generation_logs_training.csv", index=False
-                )
+            save_generation_logs()
 
     print("final", answer)
 
@@ -1526,3 +1536,18 @@ if is_on_kaggle():
         )
 
     # %% [code] {"jupyter":{"outputs_hidden":false}}
+
+
+# %% [code] {"papermill":{"duration":1644.24778,"end_time":"2024-12-14T00:30:45.363503","exception":false,"start_time":"2024-12-14T00:03:21.115723","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.621629Z","iopub.status.idle":"2025-03-30T09:16:23.621858Z","shell.execute_reply":"2025-03-30T09:16:23.621763Z"}}
+import time
+
+if is_on_kaggle() and not is_on_kaggle_submission():
+    # Reset global result arrays
+    with results_lock:
+        math_results[question] = []
+        code_results[question] = []
+        generation_logs[question] = []
+        current_question = "ENDED"
+
+    time.sleep(20)  # allow sequences to terminate
+    save_generation_logs()
