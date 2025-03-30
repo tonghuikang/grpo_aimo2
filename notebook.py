@@ -76,6 +76,7 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
 MAX_MODEL_LEN = 8192 * 2
 MATH_EXECUTION_COUNT = 16
 CODE_EXECUTION_COUNT = 12
+MAX_NUM_SEQS = 14
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
@@ -85,6 +86,7 @@ import os
 
 # Possible environments
 # - local
+# - modal
 # - Kaggle interactive
 # - Kaggle commit
 # - Kaggle competition (public and private)
@@ -117,7 +119,7 @@ if is_on_kaggle():
         "/kaggle/input/ai-mathematical-olympiad-progress-prize-2/reference.csv"
     )
 elif is_on_modal():
-    REFERENCE_CSV = "./AIME_Dataset_1983_2024.csv"
+    REFERENCE_CSV = "./reference.csv"
 else:
     REFERENCE_CSV = "./reference.csv"
 
@@ -214,8 +216,7 @@ from openai import OpenAI, Stream
 from openai.types import Completion
 
 clients: list[OpenAI] = []
-
-stream_funcs: list = []
+stream_funcs: list[Callable[[str, Optional[str]], Stream[Completion]]] = []
 if is_on_kaggle() or is_on_modal():
     print("Starting vLLM servers")
 
@@ -226,7 +227,7 @@ if is_on_kaggle() or is_on_modal():
             model_path=model_path,
             model_name=model_name,
             max_model_len=MAX_MODEL_LEN,
-            max_num_seqs=max(1, MATH_EXECUTION_COUNT),
+            max_num_seqs=MAX_NUM_SEQS,
             gpu_memory_utilization=0.90,
             logfile_suffix=f"{idx}",
             port=port,
@@ -234,19 +235,25 @@ if is_on_kaggle() or is_on_modal():
         client = OpenAI(base_url=f"http://0.0.0.0:{port}/v1", api_key="aimo")
         clients.append(client)
 
-        def stream_func(
-            prompt: str, stop: Optional[str] = None
+        # Create a closure that properly captures the current client and model_name
+        def create_stream_func(
+            client: OpenAI, model_name: str
         ) -> Callable[[str, Optional[str]], Stream[Completion]]:
-            return client.completions.create(
-                model=model_name,
-                prompt=prompt,
-                max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
-                temperature=1.0,
-                stream=True,
-                stop=stop,
-            )
+            def stream_func(
+                prompt: str, stop: Optional[str] = None
+            ) -> Stream[Completion]:
+                return client.completions.create(
+                    model=model_name,
+                    prompt=prompt,
+                    max_tokens=MAX_MODEL_LEN - count_tokens(prompt),
+                    temperature=1.0,
+                    stream=True,
+                    stop=stop,
+                )
 
-        stream_funcs.append(stream_func)
+            return stream_func
+
+        stream_funcs.append(create_stream_func(client, model_name))
 
         port += 1
 else:
@@ -281,7 +288,8 @@ def count_tokens(text: str) -> int:
     # You can ignore the warning
     return len(tokenizer.encode(text))
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.613774Z","iopub.status.idle":"2025-03-30T09:16:23.614033Z","shell.execute_reply":"2025-03-30T09:16:23.613931Z"}}
+
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:07.933701Z","iopub.execute_input":"2025-03-30T09:31:07.934024Z","iopub.status.idle":"2025-03-30T09:31:07.950903Z","shell.execute_reply.started":"2025-03-30T09:31:07.933998Z","shell.execute_reply":"2025-03-30T09:31:07.950212Z"}}
 import time
 from openai import OpenAI, APIConnectionError
 
@@ -292,6 +300,8 @@ if is_on_kaggle() or is_on_modal():
         try:
             for client in clients:
                 print(client.models.list())
+            else:
+                break
         except APIConnectionError as e:
             time.sleep(1)
             if num_retries_to_load == 0:
@@ -301,7 +311,7 @@ if is_on_kaggle() or is_on_modal():
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Helper functions
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.614610Z","iopub.status.idle":"2025-03-30T09:16:23.614848Z","shell.execute_reply":"2025-03-30T09:16:23.614749Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:18.765959Z","iopub.execute_input":"2025-03-30T09:31:18.766267Z","iopub.status.idle":"2025-03-30T09:31:18.802026Z","shell.execute_reply.started":"2025-03-30T09:31:18.766242Z","shell.execute_reply":"2025-03-30T09:31:18.801310Z"}}
 # ----- Text Processing Functions -----
 
 
@@ -807,10 +817,11 @@ def truncate_paragraph(output):
         )
     return output_new
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Code worker
 
-# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.615503Z","iopub.status.idle":"2025-03-30T09:16:23.615743Z","shell.execute_reply":"2025-03-30T09:16:23.615645Z"}}
+# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:23.952291Z","iopub.execute_input":"2025-03-30T09:31:23.952577Z","iopub.status.idle":"2025-03-30T09:31:23.972010Z","shell.execute_reply.started":"2025-03-30T09:31:23.952554Z","shell.execute_reply":"2025-03-30T09:31:23.971265Z"}}
 # NOTE: <｜begin▁of▁sentence｜> is intentionally omitted - https://github.com/vllm-project/vllm/issues/12985
 code_initial_prompt = """
 <｜User｜>
@@ -926,10 +937,10 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
         last_attempted_prompt = prompt
 
         if not flag_for_training:
-            stream_func = stream_funcs[generation_idx % len(clients)]
+            stream_func = stream_funcs[generation_idx % len(stream_funcs)]
             stream = stream_func(prompt)
         else:
-            stream_func = stream_funcs[generation_idx % len(clients)]
+            stream_func = stream_funcs[generation_idx % len(stream_funcs)]
             stream = stream_func(prompt, stop="```python")
 
         request_counter += 1
@@ -1124,10 +1135,11 @@ def run_code_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Math worker
 
-# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.616157Z","iopub.status.idle":"2025-03-30T09:16:23.616396Z","shell.execute_reply":"2025-03-30T09:16:23.616299Z"}}
+# %% [code] {"_kg_hide-input":false,"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:26.356450Z","iopub.execute_input":"2025-03-30T09:31:26.356731Z","iopub.status.idle":"2025-03-30T09:31:26.365467Z","shell.execute_reply.started":"2025-03-30T09:31:26.356707Z","shell.execute_reply":"2025-03-30T09:31:26.364778Z"}}
 # NOTE: <｜begin▁of▁sentence｜> is intentionally omitted - https://github.com/vllm-project/vllm/issues/12985
 math_initial_prompt = """
 <｜User｜>
@@ -1178,7 +1190,7 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
             break
 
         request_counter += 1
-        stream_func = stream_funcs[generation_idx % len(clients)]
+        stream_func = stream_funcs[generation_idx % len(stream_funcs)]
         stream = stream_func(prompt)
 
         for chunk in stream:
@@ -1248,10 +1260,11 @@ def run_math_worker(question: str, generation_idx: int = 0) -> str:
 
     return answer
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Control logic
 
-# %% [code] {"papermill":{"duration":0.016248,"end_time":"2024-12-14T00:03:20.989048","exception":false,"start_time":"2024-12-14T00:03:20.9728","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.616838Z","iopub.status.idle":"2025-03-30T09:16:23.617095Z","shell.execute_reply":"2025-03-30T09:16:23.616990Z"}}
+# %% [code] {"papermill":{"duration":0.016248,"end_time":"2024-12-14T00:03:20.989048","exception":false,"start_time":"2024-12-14T00:03:20.9728","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:27.969103Z","iopub.execute_input":"2025-03-30T09:31:27.969397Z","iopub.status.idle":"2025-03-30T09:31:27.985200Z","shell.execute_reply.started":"2025-03-30T09:31:27.969373Z","shell.execute_reply":"2025-03-30T09:31:27.984493Z"}}
 from typing import Optional
 from collections import defaultdict
 import random
@@ -1431,7 +1444,8 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     cutoff_times.pop()
     return answer  # Note: Do NOT return early, we NEED to pop cutoff_times
 
-# %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.617643Z","iopub.status.idle":"2025-03-30T09:16:23.617893Z","shell.execute_reply":"2025-03-30T09:16:23.617779Z"}}
+
+# %% [code] {"papermill":{"duration":0.013768,"end_time":"2024-12-14T00:03:21.010372","exception":false,"start_time":"2024-12-14T00:03:20.996604","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:28.106796Z","iopub.execute_input":"2025-03-30T09:31:28.107074Z","iopub.status.idle":"2025-03-30T09:31:28.111496Z","shell.execute_reply.started":"2025-03-30T09:31:28.107051Z","shell.execute_reply":"2025-03-30T09:31:28.110840Z"}}
 import pandas as pd
 import polars as pl
 from typing import Union
@@ -1453,10 +1467,11 @@ def predict(
     print("------\n\n\n")
     return pl.DataFrame({"id": id_, "answer": answer})
 
+
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Local tests
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.618342Z","iopub.status.idle":"2025-03-30T09:16:23.618574Z","shell.execute_reply":"2025-03-30T09:16:23.618478Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:29.718790Z","iopub.execute_input":"2025-03-30T09:31:29.719113Z","iopub.status.idle":"2025-03-30T09:31:29.723175Z","shell.execute_reply.started":"2025-03-30T09:31:29.719088Z","shell.execute_reply":"2025-03-30T09:31:29.722450Z"}}
 if is_on_kaggle_interactive():
     question_sample = "Triangle $ABC$ has side length $AB = 120$ and circumradius $R = 100$. Let $D$ be the foot of the perpendicular from $C$ to the line $AB$. What is the smallest possible length of segment $CD$?"
     question_sample = "Fred and George take part in a tennis tournament with $4046$ other players. In each round, the players are paired into $2024$ matches. How many ways are there to arrange the first round such that Fred and George do not have to play each other? (Two arrangements for the first round are \textit{different} if there is a player with a different opponent in the two arrangements.)"
@@ -1466,7 +1481,7 @@ if is_on_kaggle_interactive():
         code_results[question_sample] = []
         generation_logs[question_sample] = []
 
-# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.619014Z","iopub.status.idle":"2025-03-30T09:16:23.619250Z","shell.execute_reply":"2025-03-30T09:16:23.619148Z"}}
+# %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:31:29.858792Z","iopub.execute_input":"2025-03-30T09:31:29.859074Z","execution_failed":"2025-03-30T09:32:35.792Z"}}
 if is_on_kaggle_interactive():
     answer = run_math_worker(question_sample)
     print(answer)

@@ -20,7 +20,7 @@ image = (
     .pip_install(
         "polars",
         "pandas",
-        "vllm",
+        "vllm==0.7.1",
         "numpy",
         "transformers",
         "openai",
@@ -41,9 +41,9 @@ volume = modal.Volume.from_name("aimo2", create_if_missing=False)  # for the mod
 
 @app.function(
     image=image,
-    gpu="H100",
+    gpu="L4:4",
     cpu=32,
-    timeout=24 * 60 * 60,
+    timeout=2 * 60 * 60,
     volumes={MODELS_DIR: volume},
 )
 def execute():
