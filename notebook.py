@@ -343,7 +343,6 @@ def extract_boxed_text(text: str) -> str:
 
 
 def redact_sections(text: str) -> str:
-    """Remove Python code blocks from text to simplify processing"""
     import re
 
     pattern = r"```python(.*?)```"
@@ -355,18 +354,18 @@ def redact_sections(text: str) -> str:
     return text
 
 
-def extract_sections(text, tags=["python", "output"]):
+def extract_sections(text: str) -> str:
     import re
 
-    # Pattern to match either the blocks
-    tags_pattern = "|".join(tags)
-    pattern = rf"```({tags_pattern})\s*(.*?)```"
-
-    # Find all matches preserving their order (sequence)
-    matches = re.findall(pattern, text, re.DOTALL)
-
-    # Each match is a tuple (tag, content)
-    return "".join(text for _, text in matches)
+    pattern = r"(```python.*?```|```output.*?```)"
+    matches = re.findall(pattern, text, flags=re.DOTALL)
+    result = "\n\n".join(match.strip() for match in matches)
+    lines = []
+    for line in result.split("\n"):
+        if line.startswith("#"):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def extract_code(text: str) -> str:
@@ -907,7 +906,10 @@ from typing import Optional
 
 
 def run_code_worker(
-    question: str, generation_idx: int = 0, original_question: Optional[str] = None
+    question: str,
+    generation_idx: int = 0,
+    original_question: Optional[str] = None,
+    defer_count: int = 0,
 ) -> str:
     """
     Execute the code worker logic directly as a function
@@ -982,6 +984,7 @@ def run_code_worker(
             "question": original_question,
             "method": "code",
             "generation_idx": generation_idx,
+            "defer_count": defer_count,
             "elapsed": prompt,
             "flag_for_training": flag_for_training,
             "reason": "unassigned",
@@ -1147,6 +1150,7 @@ def run_code_worker(
             "question": original_question,
             "method": "code",
             "generation_idx": generation_idx,
+            "defer_count": defer_count,
             "timestamp": time.time() - question_start_time,
             "prompt": prompt,
             "elapsed": last_attempted_prompt,
@@ -1154,22 +1158,34 @@ def run_code_worker(
             "request_counter": request_counter,
             "token_counter": token_counter,
             "flag_for_training": False,
-            "reason": "final" if original_question == current_question else "terminated",
+            "reason": (
+                "final" if original_question == current_question else "terminated"
+            ),
         }
     )
     for generation_log in generation_logs_local:
         generation_log["eventual_answer"] = answer if answer is not None else -1
     for generation_log in generation_logs_local:
-        generation_log["correct_answer"] = question_to_answer_map.get(original_question, "")
+        generation_log["correct_answer"] = question_to_answer_map.get(
+            original_question, ""
+        )
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
         code_results[original_question].append(answer)
         generation_logs[original_question].extend(generation_logs_local)
 
-    question_modified = original_question + "\n\n" + extract_sections(prompt)
+    question_modified = (
+        original_question
+        + "\n\nHere are some code inputs and outputs to refer to:\n\n"
+        + extract_sections(prompt)
+    )
     run_math_worker(
-        question_modified, generation_idx=generation_idx, original_question=original_question
+        question_modified,
+        generation_idx=generation_idx,
+        original_question=original_question,
+        question_start_time=question_start_time,
+        defer_count=defer_count + 1,
     )
 
     return answer
@@ -1197,7 +1213,10 @@ After you get your final answer, take modulo 1000, and return the final answer w
 
 
 def run_math_worker(
-    question: str, generation_idx: int = 0, original_question: Optional[str] = None
+    question: str,
+    generation_idx: int = 0,
+    original_question: Optional[str] = None,
+    defer_count: int = 0,
 ) -> str:
     """
     Execute the math worker logic directly as a function
@@ -1258,6 +1277,7 @@ def run_math_worker(
                 "question": original_question,
                 "method": "math",
                 "generation_idx": generation_idx,
+                "defer_count": defer_count,
                 "timestamp": time.time() - question_start_time,
                 "prompt": prompt,
                 "buffer": buffer,
@@ -1281,6 +1301,7 @@ def run_math_worker(
             "question": original_question,
             "method": "math",
             "generation_idx": generation_idx,
+            "defer_count": defer_count,
             "timestamp": time.time() - question_start_time,
             "prompt": prompt,
             "buffer": buffer,
@@ -1293,9 +1314,11 @@ def run_math_worker(
 
     # Add eventual_answer to all log entries
     for generation_log in generation_logs_local:
-        generation_log["eventual_answer"] = answer
+        generation_log["eventual_answer"] = answer if answer is not None else -1
     for generation_log in generation_logs_local:
-        generation_log["correct_answer"] = question_to_answer_map.get(original_question, "")
+        generation_log["correct_answer"] = question_to_answer_map.get(
+            original_question, ""
+        )
 
     # Use thread lock when modifying shared dictionary
     with results_lock:
@@ -1397,7 +1420,7 @@ def save_generation_logs() -> None:
         generation_logs_all.extend(generation_logs_for_question)
     if generation_logs_all:
         df = pd.DataFrame(generation_logs_all)
-        df = df.sort_values(["question", "method", "generation_idx", "timestamp"])
+        df = df.sort_values(["question", "generation_idx", "timestamp", "method"])
         df.to_csv(f"generation_logs.csv", index=False)
         df[df["reason"] == "final"].to_csv(f"generation_logs_final.csv", index=False)
         df[df["flag_for_training"]].to_csv(f"generation_logs_training.csv", index=False)
