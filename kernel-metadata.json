@@ -1,0 +1,29 @@
+{
+  "id": "huikang/typewriter-r1-distill-qwen-7b-awq",
+  "id_no": 77687153,
+  "title": "typewriter-r1-distill-qwen-7b-awq",
+  "code_file": "notebook.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "huikang/pip-install-aimo2",
+    "huikang/vllm-serve"
+  ],
+  "competition_sources": [
+    "ai-mathematical-olympiad-progress-prize-2"
+  ],
+  "model_sources": [
+    "deepseek-ai/deepseek-r1/Transformers/deepseek-r1-distill-qwen-1.5b/1",
+    "huikang/deepseek-r1/Transformers/deepseek-r1-distill-qwen-7b-awq-casperhansen/1",
+    "huikang/deepseek-r1/Transformers/deepseek-r1-distill-qwen-32b-awq-casperhansen/1",
+    "huikang/deepseek-r1/Transformers/deepseek-r1-distill-qwen-14b-awq-casperhansen/1"
+  ]
+}

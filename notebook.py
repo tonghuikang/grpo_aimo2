@@ -1164,7 +1164,7 @@ def run_code_worker(
         }
     )
     for generation_log in generation_logs_local:
-        generation_log["eventual_answer"] = answer if answer is not None else -1
+        generation_log["eventual_answer"] = answer if answer != "" else -1
     for generation_log in generation_logs_local:
         generation_log["correct_answer"] = question_to_answer_map.get(
             original_question, ""
@@ -1184,7 +1184,6 @@ def run_code_worker(
         question_modified,
         generation_idx=generation_idx,
         original_question=original_question,
-        question_start_time=question_start_time,
         defer_count=defer_count + 1,
     )
 
@@ -1314,7 +1313,7 @@ def run_math_worker(
 
     # Add eventual_answer to all log entries
     for generation_log in generation_logs_local:
-        generation_log["eventual_answer"] = answer if answer is not None else -1
+        generation_log["eventual_answer"] = answer if answer != "" else -1
     for generation_log in generation_logs_local:
         generation_log["correct_answer"] = question_to_answer_map.get(
             original_question, ""
@@ -1345,25 +1344,22 @@ def has_early_answer(answers: list[str]) -> bool:
             counter[int(answer)] += 1
     if not counter:
         return False
-    highest_frequency = max(counter.values())
-    total_attempts = sum(counter.values())
+    counter[0] = (counter[0] + 1) // 2  # consider zero as sus
+    frequencies = sorted(list(counter.values()) + [0, 0])
+    highest_frequency = frequencies[-1]
+    next_highest_frequency = frequencies[-2]
 
-    if is_on_modal():
-        if total_attempts >= max(
-            1, 1 * (CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT) // 2
-        ):
-            return True
-        return False
-
-    if highest_frequency >= 2 and total_attempts <= 2:
+    # if highest_frequency >= 3 and next_highest_frequency <= 0:
+    #     return True
+    # if highest_frequency >= 4 and next_highest_frequency <= 2:
+    #     return True
+    # if highest_frequency >= 5 and next_highest_frequency <= 3:
+    #     return True
+    # if highest_frequency >= 6 and next_highest_frequency <= 4:
+    #     return True
+    if highest_frequency >= 7 and next_highest_frequency <= 5:
         return True
-    if highest_frequency >= 3 and total_attempts <= 4:
-        return True
-    if highest_frequency >= 4 and total_attempts <= 7:
-        return True
-    if highest_frequency >= 5 and total_attempts <= 11:
-        return True
-    if highest_frequency >= 6:
+    if highest_frequency >= 8:
         return True
     return False
 
@@ -1420,7 +1416,7 @@ def save_generation_logs() -> None:
         generation_logs_all.extend(generation_logs_for_question)
     if generation_logs_all:
         df = pd.DataFrame(generation_logs_all)
-        df = df.sort_values(["question", "generation_idx", "timestamp", "method"])
+        df = df.sort_values(["question", "generation_idx", "timestamp", "defer_count", "method"])
         df.to_csv(f"generation_logs.csv", index=False)
         df[df["reason"] == "final"].to_csv(f"generation_logs_final.csv", index=False)
         df[df["flag_for_training"]].to_csv(f"generation_logs_training.csv", index=False)
@@ -1600,7 +1596,7 @@ if is_on_kaggle():
 # %% [code] {"papermill":{"duration":1644.24778,"end_time":"2024-12-14T00:30:45.363503","exception":false,"start_time":"2024-12-14T00:03:21.115723","status":"completed"},"tags":[],"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:16:23.621629Z","iopub.status.idle":"2025-03-30T09:16:23.621858Z","shell.execute_reply":"2025-03-30T09:16:23.621763Z"}}
 import time
 
-if is_on_kaggle() and not is_on_kaggle_submission():
+if (is_on_kaggle() or is_on_modal()) and not is_on_kaggle_submission():
     # Reset global result arrays
     with results_lock:
         current_question = "ENDED"
