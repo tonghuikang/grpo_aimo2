@@ -1463,7 +1463,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     if selected_questions_only and not is_on_kaggle_submission():
         # if "Fred" not in question:
         #     return 210
-        if "Triangle" not in question:
+        if "Triangle" not in question and "Fred" not in question:
             return 210
         # if "circumcircle" not in question:
         #     return 210
