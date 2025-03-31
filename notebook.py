@@ -144,7 +144,7 @@ if is_on_modal():
     df_reference.sample(min(len(df_reference), 1000), random_state=43)
 
     start_time = time.time()
-    final_cutoff_time = start_time + len(df_reference) * 3 * 60
+    final_cutoff_time = start_time + len(df_reference) * 6 * 60
     cutoff_times = [
         int(x)
         for x in np.linspace(
@@ -1364,22 +1364,25 @@ def has_early_answer(answers: list[str]) -> bool:
     counter[0] = (counter[0] + 1) // 2  # consider zero as sus
     frequencies = sorted(list(counter.values()) + [0, 0])
     highest_frequency = frequencies[-1]
-    next_highest_frequency = frequencies[-2]
+    second_highest_frequency = frequencies[-2]
+    third_highest_frequency = frequencies[-3]
 
     if is_on_modal():
         return highest_frequency >= CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
 
-    # if highest_frequency >= 3 and next_highest_frequency <= 0:
-    #     return True
-    # if highest_frequency >= 4 and next_highest_frequency <= 2:
-    #     return True
-    # if highest_frequency >= 5 and next_highest_frequency <= 3:
-    #     return True
-    # if highest_frequency >= 6 and next_highest_frequency <= 4:
-    #     return True
-    if highest_frequency >= 7 and next_highest_frequency <= 5:
+    if highest_frequency >= 3 and second_highest_frequency <= 0:
         return True
-    if highest_frequency >= 8:
+    if highest_frequency >= 4 and second_highest_frequency <= 1 and third_highest_frequency <= 0:
+        return True
+    if highest_frequency >= 5 and second_highest_frequency <= 3 and third_highest_frequency <= 1:
+        return True
+    if highest_frequency >= 6 and second_highest_frequency <= 4:
+        return True
+    if highest_frequency >= 7 and second_highest_frequency <= 5:
+        return True
+    if highest_frequency >= 8 and second_highest_frequency <= 7:
+        return True
+    if highest_frequency >= 9:
         return True
     return False
 
@@ -1459,7 +1462,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         current_question = question
 
     selected_questions_only: bool = True
-    # selected_questions_only: bool = False
+    selected_questions_only: bool = False
     if selected_questions_only and not is_on_kaggle_submission():
         # if "Fred" not in question:
         #     return 210
@@ -1503,6 +1506,8 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
         print("code", current_code_results)
 
         # Early termination if we have enough confident answers
+        if has_early_answer(current_math_results):
+            break
         if has_early_answer(current_code_results + current_math_results):
             break
 
@@ -1510,6 +1515,7 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
             len(current_code_results) + len(current_math_results)
             == MATH_EXECUTION_COUNT + CODE_EXECUTION_COUNT
         ):
+            # yes, even as we defer call from code to math and vice versa
             break
 
         print()
@@ -1520,8 +1526,10 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
 
     # Get thread-safe copies for final answer selection
     with results_lock:
+        current_math_results = math_results[question].copy()
+        current_code_results = code_results[question].copy()
         answer: Optional[int] = select_answer(
-            math_results[question].copy() + code_results[question].copy()
+            current_math_results + current_code_results
         )
         if not is_on_kaggle_submission():
             save_generation_logs()
