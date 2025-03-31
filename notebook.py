@@ -71,11 +71,11 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
 ]
 
-# # Deploy a single 2 x 7b model
-# MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
-#     (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
-# ]
+# Deploy a single 2 x 7b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
+    (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
+]
 
 # # Deploy a 4 x 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
@@ -351,6 +351,8 @@ def redact_sections(text: str) -> str:
     text = re.sub(pattern, "[OUTPUT REDACTED]", text, flags=re.DOTALL)
     # pattern = r"```<think>(.*?)</think>"
     # text = re.sub(pattern, "[THOUGHTS REDACTED]", text, flags=re.DOTALL)
+    pattern = r"<thoughts>(.*?)</thoughts>"
+    text = re.sub(pattern, "[THOUGHTS REDACTED]", text, flags=re.DOTALL)
     return text
 
 
@@ -362,7 +364,7 @@ def extract_sections(text: str) -> str:
     result = "\n\n".join(match.strip() for match in matches)
     lines = []
     for line in result.split("\n"):
-        if line.startswith("#"):
+        if line.strip().startswith("#"):
             continue
         lines.append(line)
     return "\n".join(lines)
@@ -952,19 +954,11 @@ def run_code_worker(
     flag_for_training = False
     request_counter = 0
     token_counter = 0
-    already_deferred_to_math = False
 
     while count_tokens(prompt) <= MAX_MODEL_LEN - 10:
         answer = extract_boxed_text(redact_sections(prompt))
         if answer and is_valid_answer_string(answer):
-            if already_deferred_to_math:
-                break
-            else:
-                already_deferred_to_math = True
-                reset_chunk = "<｜end▁of▁sentence｜>" + math_initial_prompt.format(
-                    question=original_question
-                )
-                add_text_chunk(reset_chunk, reset_buffer=True)
+            break
         if original_question != current_question:
             break
         if request_counter > 20:
@@ -1124,6 +1118,7 @@ def run_code_worker(
             generation_log["reason"] = "stop_token"
 
             if not extract_boxed_text(redact_sections(prompt)):
+                # stop token returned without answer
                 if generation_log["flag_for_training"]:
                     # if flag_for_training, if not submitting answer, assume all stop tokens is ```python
                     reset_chunk = "\n```python\n"
@@ -1175,17 +1170,23 @@ def run_code_worker(
         code_results[original_question].append(answer)
         generation_logs[original_question].extend(generation_logs_local)
 
-    question_modified = (
-        original_question
-        + "\n\nHere are some code inputs and outputs to refer to:\n\n"
-        + extract_sections(prompt)
-    )
-    run_math_worker(
-        question_modified,
-        generation_idx=generation_idx,
-        original_question=original_question,
-        defer_count=defer_count + 1,
-    )
+    if defer_count == 0:
+        question_modified = original_question
+        extracted_sections = extract_sections(prompt)
+        if extracted_sections:
+            question_modified += (
+                "\n\nHere are some code inputs and outputs to refer to:\n\n"
+                + extracted_sections
+            )
+        if answer:
+            question_modified += f"\n\nHint: the answer might be: {answer}"
+            question_modified += "\n\nYou could check whether the answer makes sense."
+        run_math_worker(
+            question_modified,
+            generation_idx=generation_idx,
+            original_question=original_question,
+            defer_count=defer_count + 1,
+        )
 
     return answer
 
@@ -1324,6 +1325,22 @@ def run_math_worker(
         math_results[original_question].append(answer)
         generation_logs[original_question].extend(generation_logs_local)
 
+    if defer_count == 0:
+        question_modified = original_question
+        if buffer:
+            question_modified += f"\n\nHere are some thoughts to refer to \n\n<thoughts>\n{buffer}\n</thoughts>\n\n"
+        if answer:
+            question_modified += f"\n\nHint: the answer might be: {answer}"
+            question_modified += (
+                "\n\nYou write code to check whether the calculation is correct."
+            )
+        run_code_worker(
+            question_modified,
+            generation_idx=generation_idx,
+            original_question=original_question,
+            defer_count=defer_count + 1,
+        )
+
     return answer
 
 
@@ -1348,6 +1365,9 @@ def has_early_answer(answers: list[str]) -> bool:
     frequencies = sorted(list(counter.values()) + [0, 0])
     highest_frequency = frequencies[-1]
     next_highest_frequency = frequencies[-2]
+
+    if is_on_modal():
+        return highest_frequency >= CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
 
     # if highest_frequency >= 3 and next_highest_frequency <= 0:
     #     return True
@@ -1374,6 +1394,7 @@ def select_answer(answers: list[str]) -> Optional[int]:
             pass
     if not counter:
         return None
+    counter[0] = (counter[0] + 1) // 2
     _, answer_result = sorted([(v, k) for k, v in counter.items()], reverse=True)[0]
     return answer_result % 1000
 
@@ -1416,7 +1437,9 @@ def save_generation_logs() -> None:
         generation_logs_all.extend(generation_logs_for_question)
     if generation_logs_all:
         df = pd.DataFrame(generation_logs_all)
-        df = df.sort_values(["question", "generation_idx", "timestamp", "defer_count", "method"])
+        df = df.sort_values(
+            ["question", "generation_idx", "defer_count", "timestamp", "method"]
+        )
         df.to_csv(f"generation_logs.csv", index=False)
         df[df["reason"] == "final"].to_csv(f"generation_logs_final.csv", index=False)
         df[df["flag_for_training"]].to_csv(f"generation_logs_training.csv", index=False)
@@ -1438,10 +1461,10 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
     selected_questions_only: bool = True
     # selected_questions_only: bool = False
     if selected_questions_only and not is_on_kaggle_submission():
-        if "Fred" not in question:
-            return 210
-        # if "Triangle" not in question:
+        # if "Fred" not in question:
         #     return 210
+        if "Triangle" not in question:
+            return 210
         # if "circumcircle" not in question:
         #     return 210
         # if "Triangle" not in question and "circumcircle" not in question:
@@ -1452,15 +1475,17 @@ def predict_for_question(question: str, id_: str = "placeholder_id") -> int:
 
     threads = []
     generation_idx = 0
-    for _ in range(MATH_EXECUTION_COUNT):
-        generation_idx += 1
-        thread = start_math_execution(question, generation_idx)
-        threads.append(thread)
+    for idx in range(max(MATH_EXECUTION_COUNT, CODE_EXECUTION_COUNT)):
+        # I want to split the GPU usage
+        if idx < MATH_EXECUTION_COUNT:
+            generation_idx += 1
+            thread = start_math_execution(question, generation_idx)
+            threads.append(thread)
 
-    for _ in range(CODE_EXECUTION_COUNT):
-        generation_idx += 1
-        thread = start_code_execution(question, generation_idx)
-        threads.append(thread)
+        if idx < CODE_EXECUTION_COUNT:
+            generation_idx += 1
+            thread = start_code_execution(question, generation_idx)
+            threads.append(thread)
 
     while True:
         # Check for timeout
