@@ -60,22 +60,23 @@ if is_on_modal():
 
 # %% [code] {"jupyter":{"outputs_hidden":false},"execution":{"iopub.status.busy":"2025-03-30T09:21:29.298270Z","iopub.execute_input":"2025-03-30T09:21:29.298571Z","iopub.status.idle":"2025-03-30T09:21:29.303501Z","shell.execute_reply.started":"2025-03-30T09:21:29.298548Z","shell.execute_reply":"2025-03-30T09:21:29.302744Z"}}
 # Deploy a single 32b model
+MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+    (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
+]
+MATH_EXECUTION_COUNT = 8
+CODE_EXECUTION_COUNT = 8
+MAX_NUM_SEQS = 32
+
+# # Deploy a single 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-#     (MODEL_NAMES[0], MODEL_PATHS[0], [0, 1, 2, 3]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
 # ]
-# MATH_EXECUTION_COUNT = 8
-# CODE_EXECUTION_COUNT = 8
 
-# Deploy a single 7b model
-MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1, 2, 3]),
-]
-
-# Deploy a single 2 x 7b model
-MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
-    (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
-    (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
-]
+# # Deploy a single 2 x 7b model
+# MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [0, 1]),
+#     (MODEL_NAMES[1], MODEL_PATHS[1], [2, 3]),
+# ]
 
 # # Deploy a 4 x 7b model
 # MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
@@ -87,9 +88,9 @@ MODEL_NAMES_PATHS_GPUS: list[tuple[str, str, list[int]]] = [
 
 
 MAX_MODEL_LEN = 8192 * 2
-MATH_EXECUTION_COUNT = 16
-CODE_EXECUTION_COUNT = 16
-MAX_NUM_SEQS = 32
+# MATH_EXECUTION_COUNT = 16
+# CODE_EXECUTION_COUNT = 16
+# MAX_NUM_SEQS = 32
 
 # %% [markdown] {"jupyter":{"outputs_hidden":false}}
 # # Environment
@@ -1370,19 +1371,17 @@ def has_early_answer(answers: list[str]) -> bool:
     if is_on_modal():
         return highest_frequency >= CODE_EXECUTION_COUNT + MATH_EXECUTION_COUNT
 
-    if highest_frequency >= 3 and second_highest_frequency <= 0:
+    if (
+        highest_frequency >= 2
+        and second_highest_frequency <= 0
+        and third_highest_frequency <= 0
+    ):
         return True
-    if highest_frequency >= 4 and second_highest_frequency <= 1 and third_highest_frequency <= 0:
+    if highest_frequency >= 3 and second_highest_frequency <= 1:
         return True
-    if highest_frequency >= 5 and second_highest_frequency <= 3 and third_highest_frequency <= 1:
+    if highest_frequency >= 4 and second_highest_frequency <= 3:
         return True
-    if highest_frequency >= 6 and second_highest_frequency <= 4:
-        return True
-    if highest_frequency >= 7 and second_highest_frequency <= 5:
-        return True
-    if highest_frequency >= 8 and second_highest_frequency <= 7:
-        return True
-    if highest_frequency >= 9:
+    if highest_frequency >= 5:
         return True
     return False
 
