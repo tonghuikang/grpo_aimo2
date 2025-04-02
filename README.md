@@ -2,7 +2,7 @@ This describes my approach at fine-tuning `DeepSeek-R1-Distill-Qwen-1.5B` to cla
 
 However, I did not achieve improvements even in offline results. Nevertheless, I share my learnings here.
 
-These are some hypotheses that motivate this
+These are some hypotheses that motivate this:
 
 - I expect the `DeepSeek-R1-Distill-Qwen-7B` to be already well-tuned by DeepSeek to solve math problems from scratch. If I don't have lots of GPUs, I should not expect to outperform what DeepSeek has tuned.
 - However, it seems that `DeepSeek-R1-Distill-Qwen-7B` is bad at recognizing whether the code execution output makes sense - maybe the LLM hasn't been trained to do this.
@@ -11,15 +11,15 @@ These are some hypotheses that motivate this
 Therefore, I have reduced the task here from solving the full problem of solving math Olympiad problems to just classification of code execution output. The role of the `DeepSeek-R1-Distill-Qwen-1.5B` is now to decide between
 
 - Submitting an answer by writing an answer in `\boxed{}` in which the answer might be wrong or correct
-- Decline to submit and answer by pointing out some mistake and continuing with writing more Python code
+- Decline to submit an answer by pointing out some mistake and continuing with writing more Python code
 
-There are some constraints on finetuning LLMs
+There are some constraints on finetuning LLMs:
 
 - With some [free GPU credits from Modal labs](https://modal.com/pricing) from a [fine-tuning course I participated](https://maven.com/parlance-labs/fine-tuning), the biggest instance I have access to is a single 8 x H100 instance node.
-- I found out that the 7B model tuned by the second prize winner [has only 1k context length](https://github.com/AIMO-CMU-MATH/CMU_MATH-AIMO/blob/main/finetune_code/scripts_aimo/finetune_policy.sh) and he used [8 X A6000 GPUs](https://github.com/AIMO-CMU-MATH/CMU_MATH-AIMO/blob/main/finetune_code/README.md) which has 48GB memory. (H100 has 80GB memory, not much more).
-- However, reasoning models cannot do much with only 1k context length. Also for GRPO, the group computation requires all the entire group to be in [memory](https://github.com/huggingface/trl/issues/3061#issuecomment-2769820939). I should start with a 1.5B model instead with maybe 4k context length - and it seems that I need 2 x H100 at minimum, and scale the context length later if my experiments proves successful.
+- I found out that the 7B model tuned by the second prize winner [has only 1k context length](https://github.com/AIMO-CMU-MATH/CMU_MATH-AIMO/blob/main/finetune_code/scripts_aimo/finetune_policy.sh) and he used [8 x A6000 GPUs](https://github.com/AIMO-CMU-MATH/CMU_MATH-AIMO/blob/main/finetune_code/README.md) which has 48GB memory. (H100 has 80GB memory, not much more).
+- However, reasoning models cannot do much with only 1k context length. Also for GRPO, the group computation requires all the entire group to be in [memory](https://github.com/huggingface/trl/issues/3061#issuecomment-2769820939). I should start with a 1.5B model instead with maybe 4k context length - and it seems that I need 2 x H100 at minimum, and scale the context length later if my experiments prove successful.
 
-This is how I intend to approach tuning LLMs
+This is how I intend to approach tuning LLMs:
 
 - I first try to get the LLM to respond in the correct format. I have two reward functions regarding formatting - one for length and one for responding in sentences of similar length spaced by two newlines.
 - After the LLM has plateaued in formatting rewards, then I introduce the correctness reward.
@@ -27,7 +27,7 @@ This is how I intend to approach tuning LLMs
 
 Dataset
 
-- I marked LLM generation that are eligible for training. The completion string that is eligible for training is the string from the code execution output to end of text, or start of Python code delimiter "```python" Samples are available [here](https://www.kaggle.com/code/huikang/r1-distill-qwen-tir/output?select=generation_logs_training.csv).
+- I marked LLM generations that are eligible for training. The completion string that is eligible for training is the string from the code execution output to end of text, or start of Python code delimiter "```python". Samples are available [here](https://www.kaggle.com/code/huikang/r1-distill-qwen-tir/output?select=generation_logs_training.csv).
 - I filtered for generations that are under 3000 input tokens and under 1000 output tokens - because I wanted to start training on 4k context length. 3000 input tokens should allow for some multi-step interaction, which I want the LLM to do well in.
 - For each question, I pair a generation that leads to a wrong answer and another generation that leads to the correct answer.
 - The full dataset is [here](https://github.com/tonghuikang/grpo_aimo2/blob/master/training_dataset.csv).
@@ -45,10 +45,10 @@ The reward function is
 = `f(k) * (length_ref + formatting_ref)` + `(1 - f(k)) * correctness_ref`
 
 `f(k) = 1` until 25% of training and then linearly decreases to `0.25`
-The maximum value of `length_ref`, `formatting_ref, and `correctness_ref` should be 1
+The maximum value of `length_ref`, `formatting_ref`, and `correctness_ref` should be 1
 
-Here are the plots explained
-- `length_ref` and `formatting_ref` increases and plateaued at 25% of training.
+Here are the plots explained:
+- `length_ref` and `formatting_ref` increased and plateaued at 25% of training.
 - `correctness_ref` did not manage to improve. Yes it did improve initially, but that happened when no weight is given to `correctness_ref`. However it is no better than random or choosing to not submit answers every time - both of which will provide a `correctness_ref` value of zero. If the classification is perfect, the `correctness_ref` should be around 0.5, for reference.
 - This is the report with more charts - https://api.wandb.ai/links/htong-quora-quora/w7hjqk8y which costs around $40 of Modal credits each run.
 
